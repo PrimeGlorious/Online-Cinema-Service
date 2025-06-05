@@ -179,3 +179,18 @@ def require_admin(
             detail="Admin privileges required."
         )
     return current_user
+
+
+def require_moderator(
+    current_user: UserModel = Depends(get_current_user)
+) -> UserModel:
+    """
+    Dependency to ensure that the current user is a moderator or admin.
+    Raises HTTP 403 if not.
+    """
+    if current_user.group.name not in [UserGroupEnum.MODERATOR, UserGroupEnum.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Moderator or admin privileges required."
+        )
+    return current_user
