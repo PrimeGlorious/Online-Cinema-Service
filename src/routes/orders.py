@@ -121,5 +121,28 @@ async def list_all_orders(
         stmt = stmt.where(OrderModel.created_at <= to_date)
 
     result = await db.execute(stmt)
-    return result.scalars().all()
+    orders = result.scalars().all()
+    return [OrderReadSchema.from_orm(order) for order in orders]
 
+@router.get(
+    "/orders/",
+    response_model=List[OrderReadSchema],
+    summary="List user's own orders"
+)
+async def list_my_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    status: Optional[OrderStatusEnum] = None
+) -> List[OrderReadSchema]:
+    stmt = (
+        select(OrderModel)
+        .options(selectinload(OrderModel.items))
+        .where(OrderModel.user_id == current_user.id)
+    )
+
+    if status:
+        stmt = stmt.where(OrderModel.status == status)
+
+    result = await db.execute(stmt)
+    orders = result.scalars().all()
+    return [OrderReadSchema.from_orm(order) for order in orders]
