@@ -1,22 +1,9 @@
-from pydantic import BaseModel, Field
 from typing import List, Optional
-from decimal import Decimal
+from uuid import UUID
+from pydantic import BaseModel, Field
 
 
-class CertificationBase(BaseModel):
-    name: str
-
-
-class CertificationCreate(CertificationBase):
-    pass
-
-
-class CertificationRead(CertificationBase):
-    id: int
-
-    class Config:
-        orm_mode = True
-
+# --- Genre ---
 
 class GenreBase(BaseModel):
     name: str
@@ -33,6 +20,8 @@ class GenreRead(GenreBase):
         orm_mode = True
 
 
+# --- Star ---
+
 class StarBase(BaseModel):
     name: str
 
@@ -47,6 +36,8 @@ class StarRead(StarBase):
     class Config:
         orm_mode = True
 
+
+# --- Director ---
 
 class DirectorBase(BaseModel):
     name: str
@@ -63,6 +54,25 @@ class DirectorRead(DirectorBase):
         orm_mode = True
 
 
+# --- Certification ---
+
+class CertificationBase(BaseModel):
+    name: str
+
+
+class CertificationCreate(CertificationBase):
+    pass
+
+
+class CertificationRead(CertificationBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+# --- Movie ---
+
 class MovieBase(BaseModel):
     name: str
     year: int
@@ -72,37 +82,39 @@ class MovieBase(BaseModel):
     meta_score: Optional[float] = None
     gross: Optional[float] = None
     description: str
-    price: Decimal
+    price: Optional[float] = None
     certification_id: int
-    genre_ids: List[int]
-    star_ids: List[int]
-    director_ids: List[int]
 
 
 class MovieCreate(MovieBase):
-    pass
+    genre_ids: List[int] = Field(default_factory=list)
+    star_ids: List[int] = Field(default_factory=list)
+    director_ids: List[int] = Field(default_factory=list)
 
 
-class MovieUpdate(MovieBase):
-    pass
-
-
-class MovieRead(BaseModel):
-    id: int
-    uuid: str
-    name: str
-    year: int
-    time: int
-    imdb: float
-    votes: int
+class MovieUpdate(BaseModel):
+    name: Optional[str]
+    year: Optional[int]
+    time: Optional[int]
+    imdb: Optional[float]
+    votes: Optional[int]
     meta_score: Optional[float]
     gross: Optional[float]
-    description: str
-    price: Decimal
+    description: Optional[str]
+    price: Optional[float]
+    certification_id: Optional[int]
+    genre_ids: Optional[List[int]]
+    star_ids: Optional[List[int]]
+    director_ids: Optional[List[int]]
+
+
+class MovieRead(MovieBase):
+    id: int
+    uuid: UUID
+    genres: List[GenreRead] = []
+    stars: List[StarRead] = []
+    directors: List[DirectorRead] = []
     certification: CertificationRead
-    genres: List[GenreRead]
-    stars: List[StarRead]
-    directors: List[DirectorRead]
 
     class Config:
         orm_mode = True
