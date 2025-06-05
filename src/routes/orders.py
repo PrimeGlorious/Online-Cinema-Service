@@ -1,8 +1,9 @@
 from datetime import datetime
+from typing import Optional, List
 
 from sqlalchemy import select
 
-from fastapi import APIRouter, status, Depends, HTTPException
+from fastapi import APIRouter, status, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -93,4 +94,32 @@ async def register_user(
     await db.refresh(order)
 
     return OrderReadSchema.from_orm(order)
+
+
+@router.get(
+    "/admin/orders/",
+    response_model=List[OrderReadSchema],
+    summary="Admin: List all orders with filters"
+)
+async def list_all_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(require_admin),
+    status: Optional[OrderStatusEnum] = Query(None),
+    user_id: Optional[int] = Query(None),
+    from_date: Optional[datetime] = Query(None),
+    to_date: Optional[datetime] = Query(None),
+) -> List[OrderReadSchema]:
+    stmt = select(OrderModel).options(selectinload(OrderModel.items))
+
+    if status:
+        stmt = stmt.where(OrderModel.status == status)
+    if user_id:
+        stmt = stmt.where(OrderModel.user_id == user_id)
+    if from_date:
+        stmt = stmt.where(OrderModel.created_at >= from_date)
+    if to_date:
+        stmt = stmt.where(OrderModel.created_at <= to_date)
+
+    result = await db.execute(stmt)
+    return result.scalars().all()
 
