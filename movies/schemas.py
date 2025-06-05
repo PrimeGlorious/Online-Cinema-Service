@@ -1,5 +1,7 @@
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
+from enum import Enum
 from pydantic import BaseModel, Field
 
 
@@ -93,19 +95,19 @@ class MovieCreate(MovieBase):
 
 
 class MovieUpdate(BaseModel):
-    name: Optional[str]
-    year: Optional[int]
-    time: Optional[int]
-    imdb: Optional[float]
-    votes: Optional[int]
-    meta_score: Optional[float]
-    gross: Optional[float]
-    description: Optional[str]
-    price: Optional[float]
-    certification_id: Optional[int]
-    genre_ids: Optional[List[int]]
-    star_ids: Optional[List[int]]
-    director_ids: Optional[List[int]]
+    name: Optional[str] = None
+    year: Optional[int] = None
+    time: Optional[int] = None
+    imdb: Optional[float] = None
+    votes: Optional[int] = None
+    meta_score: Optional[float] = None
+    gross: Optional[float] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    certification_id: Optional[int] = None
+    genre_ids: Optional[List[int]] = None
+    star_ids: Optional[List[int]] = None
+    director_ids: Optional[List[int]] = None
 
 
 class MovieRead(MovieBase):
@@ -115,6 +117,79 @@ class MovieRead(MovieBase):
     stars: List[StarRead] = []
     directors: List[DirectorRead] = []
     certification: CertificationRead
+
+    class Config:
+        orm_mode = True
+
+
+class Movie(MovieBase):
+    id: int
+    uuid: UUID
+
+    class Config:
+        orm_mode = True
+
+
+class MovieLikeBase(BaseModel):
+    movie_id: int
+    like: bool
+
+
+class MovieLikeCreate(MovieLikeBase):
+    pass
+
+
+class MovieCommentBase(BaseModel):
+    movie_id: int
+    text: str
+    parent_comment_id: Optional[int] = None
+
+
+class MovieCommentCreate(MovieCommentBase):
+    pass
+
+
+class MovieComment(MovieCommentBase):
+    id: int
+    user_id: int
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class MovieRatingBase(BaseModel):
+    movie_id: int
+    score: int = Field(..., ge=1, le=10)
+
+
+class MovieRatingCreate(MovieRatingBase):
+    pass
+
+
+class MovieFavoriteBase(BaseModel):
+    movie_id: int
+
+
+class MovieFavoriteCreate(MovieFavoriteBase):
+    pass
+
+
+class NotificationType(str, Enum):
+    reply = "reply"
+    like = "like"
+    mention = "mention"
+
+
+class CommentNotificationBase(BaseModel):
+    comment_id: int
+    type: NotificationType
+
+
+class CommentNotification(CommentNotificationBase):
+    id: int
+    user_id: int
+    is_read: bool
 
     class Config:
         orm_mode = True
