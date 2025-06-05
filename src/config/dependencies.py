@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import TestingSettings, Settings, BaseAppSettings
-from database import UserModel, get_db
+from database import UserModel, get_db, UserGroupEnum
 from notifications import EmailSenderInterface, EmailSender
 from security.http import get_token
 from security.interfaces import JWTAuthManagerInterface
@@ -164,3 +164,33 @@ async def get_current_user(
         )
 
     return user
+
+
+def require_admin(
+    current_user: UserModel = Depends(get_current_user)
+) -> UserModel:
+    """
+    Dependency to ensure that the current user is an admin.
+    Raises HTTP 403 if not.
+    """
+    if current_user.group.name != UserGroupEnum.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required."
+        )
+    return current_user
+
+
+def require_moderator(
+    current_user: UserModel = Depends(get_current_user)
+) -> UserModel:
+    """
+    Dependency to ensure that the current user is a moderator or admin.
+    Raises HTTP 403 if not.
+    """
+    if current_user.group.name not in [UserGroupEnum.MODERATOR, UserGroupEnum.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Moderator or admin privileges required."
+        )
+    return current_user
