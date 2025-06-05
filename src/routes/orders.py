@@ -93,7 +93,7 @@ async def register_user(
     await db.commit()
     await db.refresh(order)
 
-    return OrderReadSchema.from_orm(order)
+    return OrderReadSchema.model_validate(order)
 
 
 @router.get(
@@ -122,7 +122,7 @@ async def list_all_orders(
 
     result = await db.execute(stmt)
     orders = result.scalars().all()
-    return [OrderReadSchema.from_orm(order) for order in orders]
+    return [OrderReadSchema.model_validate(order) for order in orders]
 
 @router.get(
     "/orders/",
@@ -145,4 +145,34 @@ async def list_my_orders(
 
     result = await db.execute(stmt)
     orders = result.scalars().all()
-    return [OrderReadSchema.from_orm(order) for order in orders]
+    return [OrderReadSchema.model_validate(order) for order in orders]
+
+
+@router.get(
+    "/orders/{order_id}",
+    response_model=OrderReadSchema,
+    summary="Get one of user's own orders"
+)
+async def get_my_order(
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+) -> OrderReadSchema:
+    stmt = (
+        select(OrderModel)
+        .options(selectinload(OrderModel.items))
+        .where(OrderModel.id == order_id)
+    )
+    result = await db.execute(stmt)
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    if order.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view your own orders."
+        )
+
+    return OrderReadSchema.model_validate(order)
