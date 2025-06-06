@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from datetime import datetime
+from typing import List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -6,10 +9,11 @@ import stripe
 import os
 
 from config import get_current_user
+from config.dependencies import require_admin
 from database import get_db, UserModel
 from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
 from database.models.payments import Payment, PaymentStatusEnum
-from schemas.payments import StripePaymentResponseSchema
+from schemas.payments import StripePaymentResponseSchema, PaymentReadSchema
 
 router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -128,3 +132,33 @@ async def stripe_webhook(
             await db.commit()
 
     return {"status": "success"}
+
+
+@router.get(
+    "/admin/payments/",
+    response_model=List[PaymentReadSchema],
+    summary="Admin: List all payments with filters",
+)
+async def list_all_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(require_admin),
+    status: Optional[PaymentStatusEnum] = Query(None),
+    user_id: Optional[int] = Query(None),
+    from_date: Optional[datetime] = Query(None),
+    to_date: Optional[datetime] = Query(None),
+) -> List[PaymentReadSchema]:
+    stmt = select(Payment).options(selectinload(OrderModel.items))
+
+    if status:
+        stmt = stmt.where(Payment.status == status)
+    if user_id:
+        stmt = stmt.where(Payment.user_id == user_id)
+    if from_date:
+        stmt = stmt.where(Payment.created_at >= from_date)
+    if to_date:
+        stmt = stmt.where(Payment.created_at <= to_date)
+
+    result = await db.execute(stmt)
+    payments = result.scalars().all()
+    return [PaymentReadSchema.model_validate(payment) for payment in payments]
+
