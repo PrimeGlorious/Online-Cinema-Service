@@ -4,6 +4,7 @@ from pydantic import (
     field_validator,
     ConfigDict
 )
+from datetime import date
 from typing import (
     List,
     Optional,
@@ -113,3 +114,27 @@ class CertificationCreateSchema(CreateUpdateBaseSchema):
 
 class CertificationUpdateSchema(CreateUpdateBaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+
+
+class MovieListItemSchema(BaseModel):
+    id: int
+    name: str
+    date: date
+    score: float
+    overview: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class MovieListResponseSchema(BaseModel):
+    movies: List[MovieListItemSchema]
+    prev_page: Optional[str]
+    next_page: Optional[str]
+    total_pages: int
+    total_items: int
+
+    model_config = {
+        "from_attributes": True,
+    }
