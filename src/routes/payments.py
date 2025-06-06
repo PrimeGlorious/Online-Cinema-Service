@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 import stripe
 import os
 
+from starlette.responses import JSONResponse
+
 from config import get_current_user
 from config.dependencies import require_admin
 from database import get_db, UserModel
@@ -85,6 +87,8 @@ async def create_payment_session(
         }],
         mode="payment",
         metadata={"payment_id": str(payment.id)},
+        success_url="http://localhost:8000/payments/success",
+        cancel_url="http://localhost:8000/payments/cancel",
     )
 
     payment.stripe_payment_intent_id = session.payment_intent
@@ -190,4 +194,20 @@ async def list_my_orders(
     result = await db.execute(stmt)
     payments = result.scalars().all()
     return [PaymentReadSchema.model_validate(payment) for payment in payments]
+
+
+@router.get("/payments/success", summary="Stripe success redirect")
+async def payment_success():
+    return JSONResponse(content={
+        "status": "success",
+        "message": "Payment completed successfully."
+    })
+
+
+@router.get("/payments/cancel", summary="Stripe cancel redirect")
+async def payment_cancel():
+    return JSONResponse(content={
+        "status": "cancelled",
+        "message": "Payment was canceled or failed."
+    })
 
