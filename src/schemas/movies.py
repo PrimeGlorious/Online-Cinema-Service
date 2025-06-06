@@ -54,6 +54,63 @@ class MovieBaseSchema(BaseModel):
         return v
 
 
+class LanguageSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                language_schema_example
+            ]
+        }
+    }
+
+
+class CountrySchema(BaseModel):
+    id: int
+    code: str
+    name: Optional[str]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                country_schema_example
+            ]
+        }
+    }
+
+
+class GenreSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                genre_schema_example
+            ]
+        }
+    }
+
+
+class ActorSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                actor_schema_example
+            ]
+        }
+    }
+
+
 class MovieCreateSchema(MovieBaseSchema):
     pass
 
@@ -72,6 +129,23 @@ class MovieUpdateSchema(MovieBaseSchema):
     genres: Optional[List[int]] = None
     directors: Optional[List[int]] = None
     stars: Optional[List[int]] = None
+
+
+class MovieDetailSchema(MovieBaseSchema):
+    id: int
+    country: CountrySchema
+    genres: List[GenreSchema]
+    actors: List[ActorSchema]
+    languages: List[LanguageSchema]
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                movie_detail_schema_example
+            ]
+        }
+    }
 
 
 class MovieResponseSchema(MovieBaseSchema):
