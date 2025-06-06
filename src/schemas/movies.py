@@ -10,7 +10,19 @@ from typing import (
     Optional,
     Literal
 )
-from decimal import Decimal
+from pydantic import condecimal
+from schemas.examples.movies import (
+    country_schema_example,
+    language_schema_example,
+    genre_schema_example,
+    actor_schema_example,
+    movie_item_schema_example,
+    movie_list_response_schema_example,
+    movie_create_schema_example,
+    movie_detail_schema_example,
+    movie_update_schema_example,
+    star_schema_example
+)
 
 
 class BaseEntitySchema(BaseModel):
@@ -31,7 +43,7 @@ class MovieBaseSchema(BaseModel):
     meta_score: Optional[float] = None
     gross: Optional[float] = None
     description: str
-    price: Decimal = Field(..., max_digits=10, decimal_places=2)
+    price: condecimal(max_digits=10, decimal_places=2)
     status: Literal["Released", "Post Production", "In Production"]
 
     certification: BaseEntitySchema
@@ -97,7 +109,7 @@ class GenreSchema(BaseModel):
     }
 
 
-class ActorSchema(BaseModel):
+class StarSchema(BaseModel):
     id: int
     name: str
 
@@ -105,7 +117,21 @@ class ActorSchema(BaseModel):
         "from_attributes": True,
         "json_schema_extra": {
             "examples": [
-                actor_schema_example
+                star_schema_example
+            ]
+        }
+    }
+
+
+class DirectorSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "examples": [
+                {"id": 1, "name": "Christopher Nolan"}
             ]
         }
     }
@@ -115,7 +141,7 @@ class MovieCreateSchema(MovieBaseSchema):
     pass
 
 
-class MovieUpdateSchema(MovieBaseSchema):
+class MovieUpdateSchema(BaseModel):
     name: Optional[str] = None
     year: Optional[int] = None
     time: Optional[int] = None
@@ -124,7 +150,7 @@ class MovieUpdateSchema(MovieBaseSchema):
     meta_score: Optional[float] = None
     gross: Optional[float] = None
     description: Optional[str] = None
-    price: Optional[Decimal] = None
+    price: Optional[condecimal(max_digits=10, decimal_places=2)] = None
     certification_id: Optional[int] = None
     genres: Optional[List[int]] = None
     directors: Optional[List[int]] = None
@@ -135,7 +161,7 @@ class MovieDetailSchema(MovieBaseSchema):
     id: int
     country: CountrySchema
     genres: List[GenreSchema]
-    actors: List[ActorSchema]
+    stars: List[StarSchema]
     languages: List[LanguageSchema]
 
     model_config = {
@@ -166,6 +192,21 @@ class GenreUpdateSchema(CreateUpdateBaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
 
 
+class GenreDeleteSchema(GenreSchema):
+    pass
+
+
+class GenreDetailSchema(GenreSchema):
+    id: int
+    movie_count: Optional[int] = Field(None, example=12)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class GenreResponseSchema(GenreSchema):
+    pass
+
+
 class StarCreateSchema(CreateUpdateBaseSchema):
     pass
 
@@ -174,12 +215,32 @@ class StarUpdateSchema(CreateUpdateBaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
 
 
+class StarDeleteSchema(StarSchema):
+    pass
+
+
+class StarDetailSchema(StarSchema):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class DirectorCreateSchema(CreateUpdateBaseSchema):
     pass
 
 
 class DirectorUpdateSchema(CreateUpdateBaseSchema):
     name: Optional[str] = Field(None, min_length=1, max_length=255)
+
+
+class DirectorDeleteSchema(DirectorSchema):
+    pass
+
+
+class DirectorDetailSchema(DirectorSchema):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CertificationCreateSchema(CreateUpdateBaseSchema):
