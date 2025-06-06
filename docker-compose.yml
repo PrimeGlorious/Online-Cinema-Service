@@ -53,6 +53,7 @@ services:
         condition: service_healthy
     volumes:
       - ./src:/usr/src/fastapi
+      - ./logs:/app/logs
     networks:
       - theater_network
 

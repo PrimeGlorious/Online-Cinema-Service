@@ -1,10 +1,10 @@
 from fastapi import FastAPI
 
-# from routes import (
-#     movie_router,
-#     accounts_router,
-#     profiles_router
-# )
+from custom.logger import setup_logger
+from routes.movies import router as movies_router
+
+
+setup_logger()
 
 app = FastAPI(
     title="Movies homework",
@@ -13,6 +13,4 @@ app = FastAPI(
 
 api_version_prefix = "/api/v1"
 
-# app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["accounts"])
-# app.include_router(profiles_router, prefix=f"{api_version_prefix}/profiles", tags=["profiles"])
-# app.include_router(movie_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
+app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
