@@ -19,6 +19,7 @@ from typing import (
 )
 
 from database import Base
+from .carts import CartItemModel
 
 
 class MovieStatusEnum(str, Enum):
@@ -105,6 +106,9 @@ class MovieModel(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
+    cart: Mapped[Optional["CartItemModel"]] = relationship(
+        "CartItemModel", back_populates="movie", uselist=False
+    )
 
     certification: Mapped["CertificationModel"] = relationship("CertificationModel", back_populates="movies")
     genres: Mapped[List["GenreModel"]] = relationship(
