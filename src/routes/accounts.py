@@ -16,10 +16,10 @@ router = APIRouter()
     status_code=status.HTTP_201_CREATED,
     summary="Register a new user",
     description="""
-    Registers a new user, assigns them to the USER group, creates an activation token, 
-    and sends an activation email. Returns the created user's info. 
+    Registers a new user, assigns them to the USER group, creates an activation token,
+    and sends an activation email. Returns the created user's info.
 
-    If the email is already registered, returns 409 Conflict. 
+    If the email is already registered, returns 409 Conflict.
     If the USER group is not found, returns 500 Internal Server Error.
     """
 )
@@ -79,6 +79,6 @@ async def register_user(
     await db.refresh(user)
 
     # Send email after commit, so user is definitely created
-    await send_activation_email(email=user.email, token=token)
+    await send_activation_email(email=user.email, token=token) # noqa F821
 
     return UserRegistrationResponseSchema.model_validate(user)
