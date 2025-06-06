@@ -39,6 +39,13 @@ async def create_payment_session(
     if order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can pay only for your orders")
 
+    actual_total = sum(item.movie.price for item in order.items)
+    if actual_total != order.total_amount:
+        raise HTTPException(
+            status_code=409,
+            detail="Order total has changed. Please try again."
+        )
+
     # Перевіряємо, чи вже є payment
     result = await db.execute(
         select(Payment).where(Payment.order_id == order_id)
