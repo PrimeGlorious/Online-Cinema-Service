@@ -283,6 +283,7 @@ class GenreListItemSchema(BaseModel):
         "from_attributes": True,
     }
 
+
 class GenreListResponseSchema(BaseModel):
     genres: List[GenreListItemSchema]
     prev_page: Optional[str]
