@@ -15,7 +15,11 @@ from config.dependencies import require_admin
 from database import get_db, UserModel
 from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
 from database.models.payments import Payment, PaymentStatusEnum
-from schemas.payments import StripePaymentResponseSchema, PaymentReadSchema, PaymentReadAdminSchema
+from schemas.payments import (
+    StripePaymentResponseSchema,
+    PaymentReadSchema,
+    PaymentReadAdminSchema,
+)
 
 router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -23,9 +27,9 @@ stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
 
 @router.post("/create-session/{order_id}", response_model=StripePaymentResponseSchema)
 async def create_payment_session(
-        order_id: int,
-        db: AsyncSession = Depends(get_db),
-        current_user: UserModel = Depends(get_current_user),
+    order_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
 ) -> StripePaymentResponseSchema:
     result = await db.execute(
         select(OrderModel)
@@ -33,36 +37,31 @@ async def create_payment_session(
         .where(OrderModel.id == order_id)
     )
     order = result.scalar_one_or_none()
-    # Перевірка ордера
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    # Перевірка ордера(чи юзер оплачує свій)
     if order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can pay only for your orders")
 
     actual_total = sum(item.movie.price for item in order.items)
     if actual_total != order.total_amount:
         raise HTTPException(
-            status_code=409,
-            detail="Order total has changed. Please try again."
+            status_code=409, detail="Order total has changed. Please try again."
         )
 
-    # Перевіряємо, чи вже є payment
-    result = await db.execute(
-        select(Payment).where(Payment.order_id == order_id)
-    )
+    result = await db.execute(select(Payment).where(Payment.order_id == order_id))
     existing_payment = result.scalar_one_or_none()
 
     if existing_payment:
-        session = stripe.checkout.Session.retrieve(existing_payment.stripe_payment_intent_id)
+        session = stripe.checkout.Session.retrieve(
+            existing_payment.stripe_payment_intent_id
+        )
         return StripePaymentResponseSchema(
             payment_id=existing_payment.id,
             checkout_url=session.url,
-            status=existing_payment.status
+            status=existing_payment.status,
         )
 
-    # Якщо немає, створюємо новий
     payment = Payment(
         order_id=order.id,
         amount=order.total_amount,
@@ -75,16 +74,18 @@ async def create_payment_session(
 
     session = stripe.checkout.Session.create(
         payment_method_types=["card"],
-        line_items=[{
-            "price_data": {
-                "currency": "usd",
-                "product_data": {
-                    "name": ", ".join([item.movie.name for item in order.items])
+        line_items=[
+            {
+                "price_data": {
+                    "currency": "usd",
+                    "product_data": {
+                        "name": ", ".join([item.movie.name for item in order.items])
+                    },
+                    "unit_amount": int(order.total_amount * 100),
                 },
-                "unit_amount": int(order.total_amount * 100),
-            },
-            "quantity": 1,
-        }],
+                "quantity": 1,
+            }
+        ],
         mode="payment",
         metadata={"payment_id": str(payment.id)},
         success_url="http://localhost:8000/payments/success",
@@ -95,23 +96,23 @@ async def create_payment_session(
     await db.commit()
 
     return StripePaymentResponseSchema(
-        payment_id=payment.id,
-        checkout_url=session.url,
-        status=payment.status
+        payment_id=payment.id, checkout_url=session.url, status=payment.status
     )
 
 
 @router.post("/webhook")
 async def stripe_webhook(
-        request: Request,
-        stripe_signature: str = Header(None),
-        db: AsyncSession = Depends(get_db)
+    request: Request,
+    stripe_signature: str = Header(None),
+    db: AsyncSession = Depends(get_db),
 ):
     payload = await request.body()
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
 
     try:
-        event = stripe.Webhook.construct_event(payload, stripe_signature, endpoint_secret)
+        event = stripe.Webhook.construct_event(
+            payload, stripe_signature, endpoint_secret
+        )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -120,7 +121,9 @@ async def stripe_webhook(
         payment_id = int(session["metadata"]["payment_id"])
 
         result = await db.execute(
-            select(Payment).options(selectinload(Payment.order)).where(Payment.id == payment_id)
+            select(Payment)
+            .options(selectinload(Payment.order))
+            .where(Payment.id == payment_id)
         )
         payment = result.scalar_one_or_none()
 
@@ -133,9 +136,7 @@ async def stripe_webhook(
         session = event["data"]["object"]
         payment_id = int(session["metadata"]["payment_id"])
 
-        result = await db.execute(
-            select(Payment).where(Payment.id == payment_id)
-        )
+        result = await db.execute(select(Payment).where(Payment.id == payment_id))
         payment = result.scalar_one_or_none()
 
         if payment and payment.status == PaymentStatusEnum.PENDING:
@@ -175,7 +176,9 @@ async def list_all_orders(
 
 
 @router.get(
-    "/payments/", response_model=List[PaymentReadSchema], summary="List user's own payments"
+    "/payments/",
+    response_model=List[PaymentReadSchema],
+    summary="List user's own payments",
 )
 async def list_my_orders(
     db: AsyncSession = Depends(get_db),
@@ -198,16 +201,13 @@ async def list_my_orders(
 
 @router.get("/payments/success", summary="Stripe success redirect")
 async def payment_success():
-    return JSONResponse(content={
-        "status": "success",
-        "message": "Payment completed successfully."
-    })
+    return JSONResponse(
+        content={"status": "success", "message": "Payment completed successfully."}
+    )
 
 
 @router.get("/payments/cancel", summary="Stripe cancel redirect")
 async def payment_cancel():
-    return JSONResponse(content={
-        "status": "cancelled",
-        "message": "Payment was canceled or failed."
-    })
-
+    return JSONResponse(
+        content={"status": "cancelled", "message": "Payment was canceled or failed."}
+    )
