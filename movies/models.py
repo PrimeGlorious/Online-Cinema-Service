@@ -7,7 +7,6 @@ from sqlalchemy.dialects.postgresql import UUID
 import uuid
 from .database import Base  # Імпорт базового класу з database.py
 
-# Ассоціативні таблиці many-to-many
 
 movie_genres = Table(
     "movie_genres",
@@ -30,7 +29,6 @@ movie_directors = Table(
     Column("director_id", Integer, ForeignKey("directors.id"), primary_key=True),
 )
 
-# Моделі
 
 class Genre(Base):
     __tablename__ = "genres"

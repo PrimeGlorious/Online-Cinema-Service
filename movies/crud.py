@@ -12,30 +12,51 @@ from schemas import (
 
 # --- Genres ---
 
-def get_genre(db: Session, genre_id: int) -> Optional[models.Genre]:
-    return db.query(models.Genre).filter(models.Genre.id == genre_id).first()
 
-def get_genres(db: Session, skip: int = 0, limit: int = 100) -> List[models.Genre]:
-    return db.query(models.Genre).offset(skip).limit(limit).all()
-
-def create_genre(db: Session, genre: GenreCreate) -> models.Genre:
+def create_genre(db: Session, genre: schemas.GenreCreate) -> models.Genre:
     db_genre = models.Genre(name=genre.name)
-    try:
-        db.add(db_genre)
-        db.commit()
-        db.refresh(db_genre)
-    except IntegrityError:
-        db.rollback()
-        raise
+    db.add(db_genre)
+    db.commit()
+    db.refresh(db_genre)
     return db_genre
 
+
+def get_genres(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Genre).offset(skip).limit(limit).all()
+
+
+def get_genre(db: Session, genre_id: int):
+    return db.query(models.Genre).filter(models.Genre.id == genre_id).first()
+
+
+def update_genre(db: Session, db_genre: models.Genre, genre_update: schemas.GenreUpdate):
+    db_genre.name = genre_update.name
+    db.commit()
+    db.refresh(db_genre)
+    return db_genre
+
+
+def delete_genre(db: Session, db_genre: models.Genre):
+    db.delete(db_genre)
+    db.commit()
+
+
+def get_movies_by_genre(db: Session, genre_id: int):
+    genre = db.query(models.Genre).filter(models.Genre.id == genre_id).first()
+    if not genre:
+        return []
+    return genre.movies
+
 # --- Stars ---
+
 
 def get_star(db: Session, star_id: int) -> Optional[models.Star]:
     return db.query(models.Star).filter(models.Star.id == star_id).first()
 
+
 def get_stars(db: Session, skip: int = 0, limit: int = 100) -> List[models.Star]:
     return db.query(models.Star).offset(skip).limit(limit).all()
+
 
 def create_star(db: Session, star: StarCreate) -> models.Star:
     db_star = models.Star(name=star.name)
@@ -50,11 +71,14 @@ def create_star(db: Session, star: StarCreate) -> models.Star:
 
 # --- Directors ---
 
+
 def get_director(db: Session, director_id: int) -> Optional[models.Director]:
     return db.query(models.Director).filter(models.Director.id == director_id).first()
 
+
 def get_directors(db: Session, skip: int = 0, limit: int = 100) -> List[models.Director]:
     return db.query(models.Director).offset(skip).limit(limit).all()
+
 
 def create_director(db: Session, director: DirectorCreate) -> models.Director:
     db_director = models.Director(name=director.name)
@@ -69,11 +93,14 @@ def create_director(db: Session, director: DirectorCreate) -> models.Director:
 
 # --- Certifications ---
 
+
 def get_certification(db: Session, certification_id: int) -> Optional[models.Certification]:
     return db.query(models.Certification).filter(models.Certification.id == certification_id).first()
 
+
 def get_certifications(db: Session, skip: int = 0, limit: int = 100) -> List[models.Certification]:
     return db.query(models.Certification).offset(skip).limit(limit).all()
+
 
 def create_certification(db: Session, certification: CertificationCreate) -> models.Certification:
     db_cert = models.Certification(name=certification.name)
@@ -88,14 +115,18 @@ def create_certification(db: Session, certification: CertificationCreate) -> mod
 
 # --- Movies ---
 
+
 def get_movie(db: Session, movie_id: int) -> Optional[models.Movie]:
     return db.query(models.Movie).filter(models.Movie.id == movie_id).first()
+
 
 def get_movie_by_uuid(db: Session, movie_uuid: str) -> Optional[models.Movie]:
     return db.query(models.Movie).filter(models.Movie.uuid == movie_uuid).first()
 
+
 def get_movies(db: Session, skip: int = 0, limit: int = 100) -> List[models.Movie]:
     return db.query(models.Movie).offset(skip).limit(limit).all()
+
 
 def create_movie(db: Session, movie: MovieCreate) -> models.Movie:
     db_movie = models.Movie(
@@ -127,6 +158,7 @@ def create_movie(db: Session, movie: MovieCreate) -> models.Movie:
         raise
     return db_movie
 
+
 def update_movie(db: Session, movie: models.Movie, movie_update: MovieUpdate) -> models.Movie:
     update_data = movie_update.dict(exclude_unset=True)
     for field, value in update_data.items():
@@ -148,6 +180,7 @@ def update_movie(db: Session, movie: models.Movie, movie_update: MovieUpdate) ->
         raise
     return movie
 
+
 def delete_movie(db: Session, movie: models.Movie) -> None:
     try:
         db.delete(movie)
@@ -157,6 +190,7 @@ def delete_movie(db: Session, movie: models.Movie) -> None:
         raise
 
 # --- Likes ---
+
 
 def create_movie_like(db: Session, user_id: int, like_data: MovieLikeCreate) -> MovieLike:
     existing = db.query(MovieLike).filter_by(movie_id=like_data.movie_id, user_id=user_id).first()
@@ -181,6 +215,7 @@ def create_movie_like(db: Session, user_id: int, like_data: MovieLikeCreate) -> 
 
 # --- Comments ---
 
+
 def create_movie_comment(db: Session, user_id: int, comment_data: MovieCommentCreate) -> MovieComment:
     comment = MovieComment(
         movie_id=comment_data.movie_id,
@@ -197,10 +232,12 @@ def create_movie_comment(db: Session, user_id: int, comment_data: MovieCommentCr
         raise
     return comment
 
+
 def get_movie_comments(db: Session, movie_id: int, skip: int = 0, limit: int = 100) -> List[MovieComment]:
     return db.query(MovieComment).filter_by(movie_id=movie_id).offset(skip).limit(limit).all()
 
 # --- Ratings ---
+
 
 def create_movie_rating(db: Session, user_id: int, rating_data: MovieRatingCreate) -> MovieRating:
     existing = db.query(MovieRating).filter_by(movie_id=rating_data.movie_id, user_id=user_id).first()
@@ -225,6 +262,7 @@ def create_movie_rating(db: Session, user_id: int, rating_data: MovieRatingCreat
 
 # --- Favorites ---
 
+
 def add_movie_favorite(db: Session, user_id: int, fav_data: MovieFavoriteCreate) -> MovieFavorite:
     existing = db.query(MovieFavorite).filter_by(movie_id=fav_data.movie_id, user_id=user_id).first()
     if existing:
@@ -238,6 +276,7 @@ def add_movie_favorite(db: Session, user_id: int, fav_data: MovieFavoriteCreate)
         db.rollback()
         raise
     return new_fav
+
 
 def remove_movie_favorite(db: Session, user_id: int, movie_id: int) -> bool:
     fav = db.query(MovieFavorite).filter_by(movie_id=movie_id, user_id=user_id).first()
@@ -253,6 +292,7 @@ def remove_movie_favorite(db: Session, user_id: int, movie_id: int) -> bool:
 
 # --- Search, Filter, Sort Movies ---
 
+
 def search_filter_sort_movies(
     db: Session,
     search: Optional[str] = None,
@@ -265,17 +305,14 @@ def search_filter_sort_movies(
     skip: int = 0,
     limit: int = 20,
 ) -> Tuple[int, List[Movie]]:
-
     query = db.query(Movie)
 
     if search:
         search_like = f"%{search}%"
-        # Для унікального приєднання використаємо аліаси, щоб не дублювати join-и
         query = query.join(Movie.directors, isouter=True).join(Movie.stars, isouter=True)
         query = query.filter(
             or_(
                 Movie.name.ilike(search_like),
-                Movie.description.ilike(search_like),
                 Director.name.ilike(search_like),
                 Star.name.ilike(search_like),
             )
@@ -283,18 +320,25 @@ def search_filter_sort_movies(
 
     if year_from is not None:
         query = query.filter(Movie.year >= year_from)
+
     if year_to is not None:
         query = query.filter(Movie.year <= year_to)
+
     if imdb_from is not None:
         query = query.filter(Movie.imdb >= imdb_from)
+
     if imdb_to is not None:
         query = query.filter(Movie.imdb <= imdb_to)
 
-    if sort_by:
-        col = getattr(Movie, sort_by, None)
-        if col is not None:
-            query = query.order_by(desc(col) if sort_desc else asc(col))
+    total = query.distinct().count()
 
-    total = query.count()
-    items = query.offset(skip).limit(limit).all()
-    return total, items
+    if sort_by:
+        sort_column = getattr(Movie, sort_by, None)
+        if sort_column is not None:
+            if sort_desc:
+                query = query.order_by(desc(sort_column))
+            else:
+                query = query.order_by(asc(sort_column))
+
+    results = query.offset(skip).limit(limit).all()
+    return total, results

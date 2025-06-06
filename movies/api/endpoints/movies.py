@@ -246,3 +246,23 @@ def mark_notification_read(
         raise HTTPException(status_code=404, detail="Notification not found")
     notification.is_read = True
     db.commit()
+
+
+@router.get("/filter", response_model=List[schemas.MovieRead])
+def get_movies_filtered(
+    year: Optional[int] = Query(None, description="Filter by release year"),
+    imdb_min: Optional[float] = Query(None, description="Minimum IMDb rating"),
+    imdb_max: Optional[float] = Query(None, description="Maximum IMDb rating"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Movie)
+
+    if year is not None:
+        query = query.filter(models.Movie.year == year)
+    if imdb_min is not None:
+        query = query.filter(models.Movie.imdb >= imdb_min)
+    if imdb_max is not None:
+        query = query.filter(models.Movie.imdb <= imdb_max)
+
+    movies = query.all()
+    return movies
