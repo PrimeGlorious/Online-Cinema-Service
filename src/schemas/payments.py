@@ -3,13 +3,8 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, HttpUrl
-import enum
 
-
-class PaymentStatusEnum(str, enum.Enum):
-    CANCELED = "canceled"
-    SUCCESSFUL = "successful"
-    PENDING = "pending"
+from database.models.payments import PaymentStatusEnum
 
 
 class PaymentCreateSchema(BaseModel):
