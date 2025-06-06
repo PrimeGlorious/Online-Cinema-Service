@@ -23,6 +23,9 @@ class PaymentReadSchema(BaseModel):
     amount: Decimal
     status: PaymentStatusEnum
     created_at: datetime
-    external_payment_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class PaymentReadAdminSchema(PaymentReadSchema):
+    external_payment_id: Optional[str] = None

@@ -13,7 +13,7 @@ from config.dependencies import require_admin
 from database import get_db, UserModel
 from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
 from database.models.payments import Payment, PaymentStatusEnum
-from schemas.payments import StripePaymentResponseSchema, PaymentReadSchema
+from schemas.payments import StripePaymentResponseSchema, PaymentReadSchema, PaymentReadAdminSchema
 
 router = APIRouter()
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
@@ -146,8 +146,8 @@ async def list_all_orders(
     user_id: Optional[int] = Query(None),
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
-) -> List[PaymentReadSchema]:
-    stmt = select(Payment).options(selectinload(OrderModel.items))
+) -> List[PaymentReadAdminSchema]:
+    stmt = select(Payment).options(selectinload(Payment.order))
 
     if status:
         stmt = stmt.where(Payment.status == status)
@@ -157,6 +157,28 @@ async def list_all_orders(
         stmt = stmt.where(Payment.created_at >= from_date)
     if to_date:
         stmt = stmt.where(Payment.created_at <= to_date)
+
+    result = await db.execute(stmt)
+    payments = result.scalars().all()
+    return [PaymentReadAdminSchema.model_validate(payment) for payment in payments]
+
+
+@router.get(
+    "/payments/", response_model=List[PaymentReadSchema], summary="List user's own payments"
+)
+async def list_my_orders(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user),
+    status: Optional[PaymentStatusEnum] = None,
+) -> List[PaymentReadSchema]:
+    stmt = (
+        select(Payment)
+        .options(selectinload(Payment.order))
+        .where(Payment.user_id == current_user.id)
+    )
+
+    if status:
+        stmt = stmt.where(Payment.status == status)
 
     result = await db.execute(stmt)
     payments = result.scalars().all()
