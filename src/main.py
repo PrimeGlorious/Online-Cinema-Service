@@ -7,7 +7,7 @@ from routes.movies import router as movies_router
 setup_logger()
 
 app = FastAPI(
-    title="Movies homework",
+    title="Online Cinema Service",
     description="Description of project"
 )
 
