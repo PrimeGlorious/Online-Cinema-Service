@@ -1,5 +1,11 @@
-from fastapi import APIRouter
+from datetime import datetime, timezone, timedelta
 
+from fastapi import APIRouter, status, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
+
+from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema
 
 router = APIRouter()
 
@@ -63,11 +69,9 @@ async def register_user(
         await db.flush()
 
         # Create activation token
-        token = generate_token()
         expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
         activation_token = ActivationTokenModel(
             user_id=user.id,
-            token=token,
             expires_at=expires_at
         )
         db.add(activation_token)
