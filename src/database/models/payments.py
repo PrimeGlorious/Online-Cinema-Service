@@ -1,7 +1,8 @@
 import enum
 from datetime import datetime
+from typing import Optional
 
-from sqlalchemy import Integer, ForeignKey, DateTime, func, Enum, Numeric
+from sqlalchemy import Integer, ForeignKey, DateTime, func, Enum, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
@@ -36,6 +37,7 @@ class Payment(Base):
         nullable=False
     )
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     user = relationship("UserModel", back_populates="payments")
     order = relationship("OrderModel", back_populates="payments")

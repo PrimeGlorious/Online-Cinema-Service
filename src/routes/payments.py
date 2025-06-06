@@ -1,0 +1,130 @@
+from fastapi import APIRouter, Depends, HTTPException, Request, Header
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+import stripe
+import os
+
+from config import get_current_user
+from database import get_db, UserModel
+from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
+from database.models.payments import Payment, PaymentStatusEnum
+from schemas.payments import StripePaymentResponseSchema
+
+router = APIRouter()
+stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+
+
+@router.post("/create-session/{order_id}", response_model=StripePaymentResponseSchema)
+async def create_payment_session(
+        order_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
+) -> StripePaymentResponseSchema:
+    result = await db.execute(
+        select(OrderModel)
+        .options(selectinload(OrderModel.items).selectinload(OrderItem.movie))
+        .where(OrderModel.id == order_id)
+    )
+    order = result.scalar_one_or_none()
+    # Перевірка ордера
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    # Перевірка ордера(чи юзер оплачує свій)
+    if order.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can pay only for your orders")
+
+    # Перевіряємо, чи вже є payment
+    result = await db.execute(
+        select(Payment).where(Payment.order_id == order_id)
+    )
+    existing_payment = result.scalar_one_or_none()
+
+    if existing_payment:
+        session = stripe.checkout.Session.retrieve(existing_payment.stripe_payment_intent_id)
+        return StripePaymentResponseSchema(
+            payment_id=existing_payment.id,
+            checkout_url=session.url,
+            status=existing_payment.status
+        )
+
+    # Якщо немає, створюємо новий
+    payment = Payment(
+        order_id=order.id,
+        amount=order.total_amount,
+        currency="usd",
+        status=PaymentStatusEnum.PENDING,
+    )
+    db.add(payment)
+    await db.commit()
+    await db.refresh(payment)
+
+    session = stripe.checkout.Session.create(
+        payment_method_types=["card"],
+        line_items=[{
+            "price_data": {
+                "currency": "usd",
+                "product_data": {
+                    "name": ", ".join([item.movie.name for item in order.items])
+                },
+                "unit_amount": int(order.total_amount * 100),
+            },
+            "quantity": 1,
+        }],
+        mode="payment",
+        metadata={"payment_id": str(payment.id)},
+    )
+
+    payment.stripe_payment_intent_id = session.payment_intent
+    await db.commit()
+
+    return StripePaymentResponseSchema(
+        payment_id=payment.id,
+        checkout_url=session.url,
+        status=payment.status
+    )
+
+
+@router.post("/webhook")
+async def stripe_webhook(
+        request: Request,
+        stripe_signature: str = Header(None),
+        db: AsyncSession = Depends(get_db)
+):
+    payload = await request.body()
+    endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+    try:
+        event = stripe.Webhook.construct_event(payload, stripe_signature, endpoint_secret)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if event["type"] == "checkout.session.completed":
+        session = event["data"]["object"]
+        payment_id = int(session["metadata"]["payment_id"])
+
+        result = await db.execute(
+            select(Payment).options(selectinload(Payment.order)).where(Payment.id == payment_id)
+        )
+        payment = result.scalar_one_or_none()
+
+        if payment:
+            payment.status = PaymentStatusEnum.SUCCESSFUL
+            payment.order.status = OrderStatusEnum.PAID
+            await db.commit()
+
+    elif event["type"] == "checkout.session.expired":
+        session = event["data"]["object"]
+        payment_id = int(session["metadata"]["payment_id"])
+
+        result = await db.execute(
+            select(Payment).where(Payment.id == payment_id)
+        )
+        payment = result.scalar_one_or_none()
+
+        if payment and payment.status == PaymentStatusEnum.PENDING:
+            payment.status = PaymentStatusEnum.CANCELED
+            await db.commit()
+
+    return {"status": "success"}
