@@ -273,3 +273,86 @@ class MovieListResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+
+class GenreListItemSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+class GenreListResponseSchema(BaseModel):
+    genres: List[GenreListItemSchema]
+    prev_page: Optional[str]
+    next_page: Optional[str]
+    total_pages: int
+    total_items: int
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class StarListItemSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class StarListResponseSchema(BaseModel):
+    stars: List[StarListItemSchema]
+    prev_page: Optional[str]
+    next_page: Optional[str]
+    total_pages: int
+    total_items: int
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class DirectorListItemSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class DirectorListResponseSchema(BaseModel):
+    directors: List[DirectorListItemSchema]
+    prev_page: Optional[str]
+    next_page: Optional[str]
+    total_pages: int
+    total_items: int
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class CertificationListItemSchema(BaseModel):
+    id: int
+    name: str
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
+class CertificationListResponseSchema(BaseModel):
+    certifications: List[CertificationListItemSchema]
+    prev_page: Optional[str]
+    next_page: Optional[str]
+    total_pages: int
+    total_items: int
+
+    model_config = {
+        "from_attributes": True,
+    }

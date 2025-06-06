@@ -15,7 +15,8 @@ from crud.movies import movie_list
 from schemas.movies import (MovieListResponseSchema,
                             MovieResponseSchema,
                             MovieCreateSchema,
-                            MovieUpdateSchema
+                            MovieUpdateSchema,
+                            MovieDetailSchema
                             )
 
 router = APIRouter()
