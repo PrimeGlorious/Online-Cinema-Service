@@ -38,11 +38,11 @@ class GenreModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    movies: Mapped[List["MovieModel"]] = relationship(
-        "MovieModel",
-        secondary="movie_genres",
-        back_populates="genres"
-    )
+    # movies: Mapped[List["MovieModel"]] = relationship(
+    #     "MovieModel",
+    #     secondary="movie_genres",
+    #     back_populates="genres"
+    # )
 
     def __repr__(self):
         return f"<Genre(name='{self.name}')>"
@@ -54,11 +54,11 @@ class StarModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    movies: Mapped[List["MovieModel"]] = relationship(
-        "MovieModel",
-        secondary="movie_stars",
-        back_populates="stars"
-    )
+    # movies: Mapped[List["MovieModel"]] = relationship(
+    #     "MovieModel",
+    #     secondary="movie_stars",
+    #     back_populates="stars"
+    # )
 
     def __repr__(self):
         return f"<Star(name='{self.name}')>"
@@ -70,11 +70,11 @@ class DirectorModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    movies: Mapped[List["MovieModel"]] = relationship(
-        "MovieModel",
-        secondary="movie_directors",
-        back_populates="directors"
-    )
+    # movies: Mapped[List["MovieModel"]] = relationship(
+    #     "MovieModel",
+    #     secondary="movie_directors",
+    #     back_populates="directors"
+    # )
 
     def __repr__(self):
         return f"<Director(name='{self.name}')>"
@@ -86,10 +86,10 @@ class CertificationModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
 
-    movies: Mapped[List["MovieModel"]] = relationship(
-        "MovieModel",
-        back_populates="certification"
-    )
+    # movies: Mapped[List["MovieModel"]] = relationship(
+    #     "MovieModel",
+    #     back_populates="certification"
+    # )
 
     def __repr__(self):
         return f"<Certification(name='{self.name}')>"
@@ -111,32 +111,32 @@ class MovieModel(Base):
     price: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
 
-    certification: Mapped["CertificationModel"] = relationship("CertificationModel", back_populates="movies")
-    genres: Mapped[List["GenreModel"]] = relationship(
-        "GenreModel",
-        secondary="movie_genres",
-        back_populates="movies"
-    )
-    directors: Mapped[List["DirectorModel"]] = relationship(
-        "DirectorModel",
-        secondary="movie_directors",
-        back_populates="movies"
-    )
-    stars: Mapped[List["StarModel"]] = relationship(
-        "StarModel",
-        secondary="movie_stars",
-        back_populates="movies"
-    )
-    cart_items: Mapped[Optional["CartItemModel"]] = relationship(
-        "CartItemModel",
-        back_populates="movie",
-        uselist=False
-    )
-    order_items: Mapped[Optional["OrderModel"]] = relationship(
-        "OrderModel",
-        back_populates="movie",
-        uselist=False
-    )
+    # certification: Mapped["CertificationModel"] = relationship("CertificationModel", back_populates="movies")
+    # genres: Mapped[List["GenreModel"]] = relationship(
+    #     "GenreModel",
+    #     secondary="movie_genres",
+    #     back_populates="movies"
+    # )
+    # directors: Mapped[List["DirectorModel"]] = relationship(
+    #     "DirectorModel",
+    #     secondary="movie_directors",
+    #     back_populates="movies"
+    # )
+    # stars: Mapped[List["StarModel"]] = relationship(
+    #     "StarModel",
+    #     secondary="movie_stars",
+    #     back_populates="movies"
+    # )
+    # cart_items: Mapped[Optional["CartItemModel"]] = relationship(
+    #     "CartItemModel",
+    #     back_populates="movie",
+    #     uselist=False
+    # )
+    # order_items: Mapped[Optional["OrderItem"]] = relationship(
+    #     "OrderItem",
+    #     back_populates="movie",
+    #     uselist=False
+    # )
 
 
     __table_args__ = (

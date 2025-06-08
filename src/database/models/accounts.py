@@ -44,7 +44,7 @@ class UserGroupModel(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[UserGroupEnum] = mapped_column(Enum(UserGroupEnum), nullable=False, unique=True)
 
-    users: Mapped[List["UserModel"]] = relationship("UserModel", back_populates="group")
+    # users: Mapped[List["UserModel"]] = relationship("UserModel", back_populates="group")
 
     def __repr__(self):
         return f"<UserGroupModel(id={self.id}, name={self.name})>"
@@ -64,34 +64,34 @@ class UserModel(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
     group_id: Mapped[int] = mapped_column(ForeignKey("user_groups.id", ondelete="CASCADE"), nullable=False)
-    group: Mapped["UserGroupModel"] = relationship("UserGroupModel", back_populates="users")
-    cart: Mapped[Optional["CartModel"]] = relationship("CartModel", back_populates="user", uselist=False)
-    orders: Mapped[List["OrderModel"]] = relationship("OrderModel", back_populates="user")
-    payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="user")
+    # group: Mapped["UserGroupModel"] = relationship("UserGroupModel", back_populates="users")
+    # cart: Mapped[Optional["CartModel"]] = relationship("CartModel", back_populates="user", uselist=False)
+    # orders: Mapped[List["OrderModel"]] = relationship("OrderModel", back_populates="user")
+    # payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="user")
 
-    activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
-        "ActivationTokenModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
+    # activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
+    #     "ActivationTokenModel",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan"
+    # )
 
-    password_reset_token: Mapped[Optional["PasswordResetTokenModel"]] = relationship(
-        "PasswordResetTokenModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
+    # password_reset_token: Mapped[Optional["PasswordResetTokenModel"]] = relationship(
+    #     "PasswordResetTokenModel",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan"
+    # )
 
-    refresh_tokens: Mapped[List["RefreshTokenModel"]] = relationship(
-        "RefreshTokenModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
-
-    profile: Mapped[Optional["UserProfileModel"]] = relationship(
-        "UserProfileModel",
-        back_populates="user",
-        cascade="all, delete-orphan"
-    )
+    # refresh_tokens: Mapped[List["RefreshTokenModel"]] = relationship(
+    #     "RefreshTokenModel",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan"
+    # )
+    #
+    # profile: Mapped[Optional["UserProfileModel"]] = relationship(
+    #     "UserProfileModel",
+    #     back_populates="user",
+    #     cascade="all, delete-orphan"
+    # )
 
     def __repr__(self):
         return f"<UserModel(id={self.id}, email={self.email}, is_active={self.is_active})>"
@@ -149,7 +149,7 @@ class UserProfileModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
         unique=True)
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="profile")
+    # user: Mapped[UserModel] = relationship("UserModel", back_populates="profile")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -182,7 +182,7 @@ class TokenBaseModel(Base):
 class ActivationTokenModel(TokenBaseModel):
     __tablename__ = "activation_tokens"
 
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="activation_token")
+    # user: Mapped[UserModel] = relationship("UserModel", back_populates="activation_token")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -193,7 +193,7 @@ class ActivationTokenModel(TokenBaseModel):
 class PasswordResetTokenModel(TokenBaseModel):
     __tablename__ = "password_reset_tokens"
 
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="password_reset_token")
+    # user: Mapped[UserModel] = relationship("UserModel", back_populates="password_reset_token")
 
     __table_args__ = (UniqueConstraint("user_id"),)
 
@@ -204,7 +204,7 @@ class PasswordResetTokenModel(TokenBaseModel):
 class RefreshTokenModel(TokenBaseModel):
     __tablename__ = "refresh_tokens"
 
-    user: Mapped[UserModel] = relationship("UserModel", back_populates="refresh_tokens")
+    # user: Mapped[UserModel] = relationship("UserModel", back_populates="refresh_tokens")
     token: Mapped[str] = mapped_column(
         String(512),
         unique=True,

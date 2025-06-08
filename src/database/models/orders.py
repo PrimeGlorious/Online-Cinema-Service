@@ -34,10 +34,10 @@ class OrderModel(Base):
         default=OrderStatusEnum.PENDING
     )
     total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="order")
-
-    user = relationship("UserModel", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    # payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="order")
+    #
+    # user = relationship("UserModel", back_populates="orders")
+    # items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -54,5 +54,5 @@ class OrderItem(Base):
     )
     price_at_order: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    order = relationship("OrderModel", back_populates="items")
-    movie = relationship("MovieModel", back_populates="order_items")
+    # order = relationship("OrderModel", back_populates="items")
+    # movie = relationship("MovieModel", back_populates="order_items")

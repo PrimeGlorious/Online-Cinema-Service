@@ -18,9 +18,9 @@ class CartModel(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
 
-    user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart", uselist=False)
+    # user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart", uselist=False)
 
-    cart_items: Mapped[list["CartItemModel"]] = relationship("CartItemModel", back_populates="cart", cascade="all, delete-orphan")
+    # cart_items: Mapped[list["CartItemModel"]] = relationship("CartItemModel", back_populates="cart", cascade="all, delete-orphan")
 
 
 
@@ -40,20 +40,20 @@ class CartItemModel(Base):
         unique=False,
         nullable=False
     )
-    cart: Mapped["CartModel"] = relationship(
-        "CartModel",
-        back_populates="cart_items"
-    )
+    # cart: Mapped["CartModel"] = relationship(
+    #     "CartModel",
+    #     back_populates="cart_items"
+    # )
     movie_id: Mapped[int] = mapped_column(
         ForeignKey("movies.id",
                    ondelete="CASCADE"),
         unique=True,
         nullable=False
     )
-    movie: Mapped["MovieModel"] = relationship(
-        "MovieModel",
-        back_populates="cart_items"
-    )
+    # movie: Mapped["MovieModel"] = relationship(
+    #     "MovieModel",
+    #     back_populates="cart_items"
+    # )
     added_at: Mapped[datetime] = mapped_column(
         nullable=False,
         default=datetime.utcnow
