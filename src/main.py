@@ -4,6 +4,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from custom.logger import setup_logger
+from routes.carts import router as carts_router
 from routes.movies import router as movies_router
 
 
@@ -25,3 +26,4 @@ async def ratelimit_error(request: Request, exc: RateLimitExceeded):
 api_version_prefix = "/api/v1"
 
 app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
+app.include_router(carts_router, prefix=f"{api_version_prefix}/cart", tags=["theater"])
