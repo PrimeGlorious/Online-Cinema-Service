@@ -386,7 +386,7 @@ async def clear_cart(
             - 400 There is no items in the shopping cart.
             - 500 Internal Server Error if an error occurs during item removing.
     """
-
+    logger.info("388 ", str(cart_item_data.cart_id))
     current_cart = select(CartModel).where(CartModel.id == cart_item_data.cart_id)
     result = await db.execute(current_cart)
     existing_cart = result.scalars().first()
@@ -395,12 +395,14 @@ async def clear_cart(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
         )
-
+    logger.info("396 ", str(cart_item_data.cart_id))
     current_cart_items = select(CartItemModel).where(
         CartItemModel.cart_id == cart_item_data.cart_id
     )
+    logger.info("401")
     result = await db.execute(current_cart_items)
     existing_cart_items = result.scalars().all()
+    logger.info("403  ", str(existing_cart_items))
     if not existing_cart_items:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -413,10 +415,7 @@ async def clear_cart(
         )
         await db.commit()
 
-<<<<<<< HEAD
-=======
         logger.info("416")
->>>>>>> 962d75b (Cart functional updated)
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(
