@@ -413,6 +413,10 @@ async def clear_cart(
         )
         await db.commit()
 
+<<<<<<< HEAD
+=======
+        logger.info("416")
+>>>>>>> 962d75b (Cart functional updated)
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(
