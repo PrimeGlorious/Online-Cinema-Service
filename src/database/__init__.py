@@ -8,7 +8,7 @@ from database.models.accounts import (
     ActivationTokenModel,
     PasswordResetTokenModel,
     RefreshTokenModel,
-    UserProfileModel
+    UserProfileModel,
 )
 from database.models.movies import (
     MovieModel,
