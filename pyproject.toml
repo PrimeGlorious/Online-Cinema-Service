@@ -37,6 +37,7 @@ pytest-asyncio = "^0.25.3"
 loguru = "^0.7.3"
 colorama = "^0.4.6"
 stripe = "^12.2.0"
+slowapi = "^0.1.9"
 
 
 [build-system]
