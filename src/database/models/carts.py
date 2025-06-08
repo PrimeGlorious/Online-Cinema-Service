@@ -4,9 +4,13 @@ from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import (
-    Base, UserModel,
+    Base,
 )
-
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from database.models.accounts import UserModel
+if TYPE_CHECKING:
+    from database.models.movies import MovieModel
 
 class CartModel(Base):
     __tablename__ = "carts"
@@ -20,7 +24,7 @@ class CartModel(Base):
 
 
 
-UserModel.carts = relationship("CartModel", back_populates="user")
+# UserModel.carts = relationship("CartModel", back_populates="user")
 
 
 

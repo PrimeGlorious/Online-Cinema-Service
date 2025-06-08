@@ -18,10 +18,13 @@ from typing import (
     Optional
 )
 
-from database import (
-    Base,
-)
+from database import Base
 
+from typing import TYPE_CHECKING
+# if TYPE_CHECKING:
+#     from database.models.accounts import UserModel
+if TYPE_CHECKING:
+    from database.models.movies import MovieModel
 
 class MovieStatusEnum(str, Enum):
     RELEASED = "Released"
@@ -107,10 +110,6 @@ class MovieModel(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     price: Mapped[float] = mapped_column(DECIMAL(10, 2), nullable=False)
     certification_id: Mapped[int] = mapped_column(ForeignKey("certifications.id"), nullable=False)
-    order_items = relationship("OrderItem", back_populates="movie")
-    cart: Mapped[Optional["CartItemModel"]] = relationship(
-        "CartItemModel", back_populates="movie", uselist=False
-    )
 
     certification: Mapped["CertificationModel"] = relationship("CertificationModel", back_populates="movies")
     genres: Mapped[List["GenreModel"]] = relationship(
@@ -128,6 +127,17 @@ class MovieModel(Base):
         secondary="movie_stars",
         back_populates="movies"
     )
+    cart_items: Mapped[Optional["CartItemModel"]] = relationship(
+        "CartItemModel",
+        back_populates="movie",
+        uselist=False
+    )
+    order_items: Mapped[Optional["OrderModel"]] = relationship(
+        "OrderModel",
+        back_populates="movie",
+        uselist=False
+    )
+
 
     __table_args__ = (
         UniqueConstraint("name", "year", "time", name="unique_movie_constraint"),
