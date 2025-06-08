@@ -14,6 +14,12 @@ from database.models.movies import (
     MovieModel,
     GenreModel,
 )
+from database.models.carts import (
+    CartItemModel,
+    CartModel
+)
+from database.models.orders import OrderModel
+from database.models.payments import Payment
 from database.session_sqlite import reset_sqlite_database as reset_database
 from database.validators import accounts as accounts_validators
 

@@ -8,8 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
-from database.models.payments import Payment
-
 
 class OrderStatusEnum(str, enum.Enum):
     PENDING = "pending"

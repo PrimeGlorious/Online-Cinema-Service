@@ -29,7 +29,6 @@ if ! psql -h "$POSTGRES_HOST" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\dt" | g
 
     # Run database saver script only if alembic_version table was just created
     echo "Running database saver script..."
-    python -m database.populate
     echo "Database saver script completed."
 
     exit 0
@@ -59,5 +58,4 @@ fi
 
 # Run database saver script
 echo "Running database saver script..."
-python -m database.populate
 echo "Database saver script completed."
