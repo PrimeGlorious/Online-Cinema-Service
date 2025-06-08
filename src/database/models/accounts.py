@@ -1,6 +1,7 @@
 import enum
 from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional
+from database import Base
 
 from sqlalchemy import (
     ForeignKey,
@@ -21,10 +22,6 @@ from sqlalchemy.orm import (
     validates
 )
 
-from database import Base
-from database.models.carts import CartModel
-from database.models.orders import OrderModel
-from database.models.payments import Payment
 from database.validators import accounts as validators
 from security.passwords import hash_password, verify_password
 from security.utils import generate_secure_token
@@ -70,7 +67,7 @@ class UserModel(Base):
     group: Mapped["UserGroupModel"] = relationship("UserGroupModel", back_populates="users")
     cart: Mapped[Optional["CartModel"]] = relationship("CartModel", back_populates="user", uselist=False)
     orders: Mapped[List["OrderModel"]] = relationship("OrderModel", back_populates="user")
-    payments: Mapped[List["Payment"]] = relationship("PaymentModel", back_populates="user")
+    payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="user")
 
     activation_token: Mapped[Optional["ActivationTokenModel"]] = relationship(
         "ActivationTokenModel",

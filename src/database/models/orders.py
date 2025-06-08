@@ -8,8 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
 
-from database.models.payments import Payment
-
 
 class OrderStatusEnum(str, enum.Enum):
     PENDING = "pending"
@@ -38,9 +36,8 @@ class OrderModel(Base):
     total_amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="order")
 
-    user = relationship("UserModel", back_populates="orders")
-    items = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
-
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="orders")
+    order_items: Mapped["OrderItem"] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
 
 class OrderItem(Base):
     __tablename__ = "order_items"
@@ -56,5 +53,12 @@ class OrderItem(Base):
     )
     price_at_order: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
 
-    order = relationship("OrderModel", back_populates="items")
-    movie = relationship("MovieModel", back_populates="order_items")
+    order: Mapped["OrderModel"] = relationship(
+        "OrderModel",
+        back_populates="order_items"
+    )
+
+    movie: Mapped["MovieModel"] = relationship(
+        "MovieModel",
+        back_populates="order_items"
+    )

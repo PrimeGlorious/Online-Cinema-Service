@@ -3,9 +3,9 @@ from datetime import datetime
 from sqlalchemy import ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database import UserModel
-from database.models.base import Base
-
+from database import (
+    Base,
+)
 
 class CartModel(Base):
     __tablename__ = "carts"
@@ -16,11 +16,6 @@ class CartModel(Base):
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart", uselist=False)
 
     cart_items: Mapped[list["CartItemModel"]] = relationship("CartItemModel", back_populates="cart", cascade="all, delete-orphan")
-
-
-
-UserModel.carts = relationship("CartModel", back_populates="user")
-
 
 
 class CartItemModel(Base):

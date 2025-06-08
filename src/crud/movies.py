@@ -3,6 +3,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import MovieModel
+
 from schemas.movies import MovieListResponseSchema, MovieListItemSchema
 
 
