@@ -39,6 +39,6 @@ class Payment(Base):
     amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     stripe_payment_intent_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    # user = relationship("UserModel", back_populates="payments")
-    # order = relationship("OrderModel", back_populates="payments")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="payments")
+    order: Mapped["OrderModel"] = relationship("OrderModel", back_populates="payments")
 
