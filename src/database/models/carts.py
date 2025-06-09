@@ -37,7 +37,7 @@ class CartItemModel(Base):
     movie_id: Mapped[int] = mapped_column(
         ForeignKey("movies.id",
                    ondelete="CASCADE"),
-        unique=True,
+        unique=False,
         nullable=False
     )
     movie: Mapped["MovieModel"] = relationship(
