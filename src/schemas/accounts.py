@@ -63,3 +63,28 @@ class EmailRequestSchema(BaseModel):
     model_config = {
         "from_attributes": True
     }
+
+
+class UserLoginRequestSchema(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class UserLoginResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class TokenRefreshRequestSchema(BaseModel):
+    refresh_token: str
+
+
+class TokenRefreshResponseSchema(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+
+class LogoutRequestSchema(BaseModel):
+    refresh_token: str
