@@ -6,11 +6,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from config import get_jwt_auth_manager
+from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel
 
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
-    LogoutRequestSchema
+    LogoutRequestSchema, ChangePasswordRequest
 from tasks.emails import send_activation_email_task, send_activation_complete_email_task
 
 router = APIRouter()
@@ -285,5 +286,26 @@ async def logout(
 
     # Delete the token and commit changes
     await db.delete(refresh_token_obj)
+    await db.commit()
+    return
+
+
+@router.post("/change-password/", status_code=204)
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    # Check the old password
+    if not current_user.verify_password(data.old_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Check that the new password is different from the old one
+    if data.old_password == data.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from old password")
+
+    # Set the new password
+    current_user.password = data.new_password
+    db.add(current_user)
     await db.commit()
     return
