@@ -3,8 +3,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 
-from crud.movies import movie_list, movie_create, movie_item
-from schemas.movies import MovieListResponseSchema, MovieDetailResponseSchema, MovieCreateSchema
+from crud.movies import movie_list, movie_create, movie_item, movie_update
+from schemas.movies import (
+    MovieListResponseSchema,
+    MovieDetailResponseSchema,
+    MovieCreateSchema,
+    MoviePatchSchema
+)
+
 
 router = APIRouter()
 
@@ -80,5 +86,44 @@ async def get_movie_by_id(
 ) -> MovieDetailResponseSchema:
     return await movie_item(
         movie_id=movie_id,
+        db=db,
+    )
+
+
+@router.patch(
+    "/movies/{movie_id}/",
+    summary="Update a movie by ID",
+    description=(
+            "<h3>Update details of a specific movie by its unique ID.</h3>"
+            "<p>This endpoint updates the details of an existing movie. If the movie with "
+            "the given ID does not exist, a 404 error is returned.</p>"
+    ),
+    responses={
+        200: {
+            "description": "Movie updated successfully.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie updated successfully."}
+                }
+            },
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    }
+)
+async def update_movie(
+        movie_id: int,
+        movie_data: MoviePatchSchema,
+        db: AsyncSession = Depends(get_db),
+):
+    return await movie_update(
+        movie_id=movie_id,
+        movie_data=movie_data,
         db=db,
     )
