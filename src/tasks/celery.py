@@ -17,6 +17,8 @@ print("BROKER_URL (celery.py):", broker_url)
 
 celery_app = Celery("online_cinema_service", broker=broker_url, backend=backend_url)
 
+from tasks import emails
+
 celery_app.autodiscover_tasks(["tasks.emails"])
 
 celery_app.conf.beat_schedule = {
