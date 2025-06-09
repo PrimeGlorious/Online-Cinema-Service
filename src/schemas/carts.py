@@ -19,7 +19,7 @@ class CartCreationResponseSchema(BaseModel):
 
 class CartItemAddRequestSchema(BaseModel):
     cart_id: int
-    cart_item_id: int
+    movie_id: int
 
     model_config = {
         "from_attributes": True
@@ -37,15 +37,7 @@ class CartItemAddResponseSchema(BaseModel):
 class CartItemRemoveRequestSchema(BaseModel):
 
     cart_id: int
-    cart_item_id: int
-
-    model_config = {
-        "from_attributes": True
-    }
-
-
-class CartItemRemoveResponseSchema(BaseModel):
-    id: int
+    movie_id: int
 
     model_config = {
         "from_attributes": True
