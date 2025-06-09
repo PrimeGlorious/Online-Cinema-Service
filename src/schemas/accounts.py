@@ -106,3 +106,19 @@ class ChangePasswordRequest(BaseModel):
         if self.new_password != self.new_password_repeat:
             raise ValueError("New passwords do not match.")
         return self
+
+
+class PasswordResetRequestSchema(BaseModel):
+    email: EmailStr = Field(..., description="User email address.")
+
+
+class PasswordResetConfirmSchema(BaseModel):
+    token: str
+    new_password: str = Field(..., min_length=8)
+    new_password_repeat: str = Field(..., min_length=8)
+
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        if self.new_password != self.new_password_repeat:
+            raise ValueError("Passwords do not match.")
+        return self
