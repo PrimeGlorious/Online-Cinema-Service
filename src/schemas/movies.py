@@ -11,6 +11,56 @@ from typing import (
     Literal
 )
 from decimal import Decimal
+from enum import Enum
+
+
+class SortOrder(str, Enum):
+    ASC = "asc"
+    DESC = "desc"
+
+
+class SortField(str, Enum):
+    DATE = "date"
+    SCORE = "score"
+    PRICE = "price"
+    VOTES = "votes"
+
+
+class MovieFilterSchema(BaseModel):
+    date_from: Optional[date] = Field(None, description="Filter movies released from this date")
+    date_to: Optional[date] = Field(None, description="Filter movies released until this date")
+    score_from: Optional[float] = Field(None, ge=0, le=10, description="Filter movies with score from")
+    score_to: Optional[float] = Field(None, ge=0, le=10, description="Filter movies with score to")
+    price_from: Optional[Decimal] = Field(None, ge=0, description="Filter movies with price from")
+    price_to: Optional[Decimal] = Field(None, ge=0, description="Filter movies with price to")
+    genre: Optional[str] = Field(None, description="Filter movies by genre")
+    certification: Optional[str] = Field(None, description="Filter movies by certification")
+    director: Optional[str] = Field(None, description="Filter movies by director")
+    star: Optional[str] = Field(None, description="Filter movies by star")
+    search: Optional[str] = Field(None, description="Search in movie title, description, director, or star names")
+    sort_by: Optional[SortField] = Field(None, description="Field to sort by")
+    sort_order: Optional[SortOrder] = Field(None, description="Sort order (asc/desc)")
+
+    @field_validator("date_to")
+    def validate_date_to(cls, v, values):
+        if v is not None and "date_from" in values and values["date_from"] is not None:
+            if v < values["date_from"]:
+                raise ValueError("date_to must be greater than or equal to date_from")
+        return v
+
+    @field_validator("score_to")
+    def validate_score_to(cls, v, values):
+        if v is not None and "score_from" in values and values["score_from"] is not None:
+            if v < values["score_from"]:
+                raise ValueError("score_to must be greater than or equal to score_from")
+        return v
+
+    @field_validator("price_to")
+    def validate_price_to(cls, v, values):
+        if v is not None and "price_from" in values and values["price_from"] is not None:
+            if v < values["price_from"]:
+                raise ValueError("price_to must be greater than or equal to price_from")
+        return v
 
 
 class BaseEntitySchema(BaseModel):
