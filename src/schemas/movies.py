@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import (
     BaseModel,
     Field,
@@ -21,8 +23,6 @@ class BaseEntitySchema(BaseModel):
 
 
 class MovieBaseSchema(BaseModel):
-    id: int
-    uuid: str
     name: str = Field(..., min_length=1, max_length=255)
     year: int
     time: int
@@ -32,12 +32,6 @@ class MovieBaseSchema(BaseModel):
     gross: Optional[float] = None
     description: str
     price: Decimal = Field(..., max_digits=10, decimal_places=2)
-    status: Literal["Released", "Post Production", "In Production"]
-
-    certification: BaseEntitySchema
-    genres: List[BaseEntitySchema]
-    directors: List[BaseEntitySchema]
-    stars: List[BaseEntitySchema]
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -54,74 +48,16 @@ class MovieBaseSchema(BaseModel):
         return v
 
 
-class MovieCreateSchema(MovieBaseSchema):
-    pass
-
-
-class MovieUpdateSchema(MovieBaseSchema):
-    name: Optional[str] = None
-    year: Optional[int] = None
-    time: Optional[int] = None
-    imdb: Optional[float] = None
-    votes: Optional[int] = None
-    meta_score: Optional[float] = None
-    gross: Optional[float] = None
-    description: Optional[str] = None
-    price: Optional[Decimal] = None
-    certification_id: Optional[int] = None
-    genres: Optional[List[int]] = None
-    directors: Optional[List[int]] = None
-    stars: Optional[List[int]] = None
-
-
-class MovieResponseSchema(MovieBaseSchema):
-    pass
-
-
-class CreateUpdateBaseSchema(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class GenreCreateSchema(CreateUpdateBaseSchema):
-    pass
-
-
-class GenreUpdateSchema(CreateUpdateBaseSchema):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-
-
-class StarCreateSchema(CreateUpdateBaseSchema):
-    pass
-
-
-class StarUpdateSchema(CreateUpdateBaseSchema):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-
-
-class DirectorCreateSchema(CreateUpdateBaseSchema):
-    pass
-
-
-class DirectorUpdateSchema(CreateUpdateBaseSchema):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-
-
-class CertificationCreateSchema(CreateUpdateBaseSchema):
-    pass
-
-
-class CertificationUpdateSchema(CreateUpdateBaseSchema):
-    name: Optional[str] = Field(None, min_length=1, max_length=255)
-
-
 class MovieListItemSchema(BaseModel):
     id: int
+    uuid: UUID
     name: str
-    date: date
-    score: float
-    overview: str
+    year: int
+    time: int
+    imdb: Decimal
+    votes: int
+    meta_score: Decimal
+    price: Decimal
 
     model_config = {
         "from_attributes": True,
@@ -138,3 +74,19 @@ class MovieListResponseSchema(BaseModel):
     model_config = {
         "from_attributes": True,
     }
+
+
+class MovieDetailResponseSchema(MovieBaseSchema):
+    id: int
+    uuid: UUID
+    certification: BaseEntitySchema
+    genres: List[BaseEntitySchema]
+    directors: List[BaseEntitySchema]
+    stars: List[BaseEntitySchema]
+
+
+class MovieCreateSchema(MovieBaseSchema):
+    certification: str
+    genres: List[str]
+    directors: List[str]
+    stars: List[str]
