@@ -4,6 +4,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 from custom.logger import setup_logger
+from routes.carts import router as carts_router
 from routes.movies import router as movies_router
 from routes.genres import router as genres_router
 from routes.stars import router as stars_router
@@ -35,3 +36,4 @@ app.include_router(genres_router, prefix=f"{api_version_prefix}/theater", tags=[
 app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["theater"])
 app.include_router(orders_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(payments_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
+app.include_router(carts_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
