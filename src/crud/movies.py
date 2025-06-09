@@ -15,7 +15,8 @@ from database.models.movies import (
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
-    MovieDetailResponseSchema, MovieCreateSchema
+    MovieDetailResponseSchema,
+    MovieCreateSchema, MoviePatchSchema
 )
 
 
@@ -199,3 +200,31 @@ async def movie_item(
         )
 
     return MovieDetailResponseSchema.model_validate(movie)
+
+
+async def movie_update(
+        movie_id: int,
+        movie_data: MoviePatchSchema,
+        db: AsyncSession,
+):
+    stmt = select(MovieModel).where(MovieModel.id == movie_id)
+    result = await db.execute(stmt)
+    movie = result.scalars().first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404,
+            detail="Movie with the given ID was not found."
+        )
+
+    for field, value in movie_data.model_dump(exclude_unset=True).items():
+        setattr(movie, field, value)
+
+    try:
+        await db.commit()
+        await db.refresh(movie)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+    return {"detail": "Movie updated successfully."}
