@@ -1,15 +1,10 @@
-from fastapi import Depends, status, HTTPException, APIRouter
-from sqlalchemy import select, delete, and_
-from sqlalchemy.exc import SQLAlchemyError
+from fastapi import Depends, status, APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
-from loguru import logger
 
 from crud.carts import create_cart_logic, add_cart_item_logic, remove_cart_item_logic, clear_cart_logic, \
     retrieve_cart_content_list_logic
 from database import (
     get_db,
-    MovieModel,
 )
 
 from schemas.carts import (
@@ -23,9 +18,6 @@ from schemas.carts import (
     CartItemListResponseSchema,
     CartItemListRequestSchema
 )
-from security.interfaces import JWTAuthManagerInterface
-
-from database.models.carts import CartModel, CartItemModel
 
 
 router = APIRouter()
@@ -148,9 +140,9 @@ async def add_cart_item(
     }
 )
 async def remove_cart_item(
-    cart_item_data: CartItemAddRequestSchema,
+    cart_item_data: CartItemRemoveRequestSchema,
     db: AsyncSession = Depends(get_db),
-) -> CartItemAddResponseSchema:
+) -> MessageResponseSchema:
     return await remove_cart_item_logic(cart_item_data, db)
 
 
@@ -187,7 +179,7 @@ async def remove_cart_item(
 async def clear_cart_item(
     cart_data: CartClearRequestSchema,
     db: AsyncSession = Depends(get_db),
-) -> CartItemAddResponseSchema:
+) -> MessageResponseSchema:
     return await clear_cart_logic(cart_data, db)
 
 
@@ -211,7 +203,7 @@ async def clear_cart_item(
     }
 )
 async def retrieve_cart_content_list(
-    cart_data: CartClearRequestSchema,
+    cart_data: CartItemListRequestSchema,
     db: AsyncSession = Depends(get_db),
-) -> CartItemAddResponseSchema:
+) -> list[CartItemListResponseSchema]:
     return await retrieve_cart_content_list_logic(cart_data, db)

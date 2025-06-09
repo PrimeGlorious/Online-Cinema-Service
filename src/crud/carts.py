@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import Depends, status, HTTPException
 from sqlalchemy import select, and_, delete
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import joinedload
 
 from database import (
     get_db,
@@ -10,9 +10,17 @@ from database import (
     UserModel,
     CartModel, CartItemModel
 )
-from schemas.carts import CartCreationResponseSchema, CartCreationRequestSchema, CartItemAddRequestSchema, \
-    CartItemAddResponseSchema, CartItemRemoveRequestSchema, MessageResponseSchema, CartClearRequestSchema, \
-    CartItemListRequestSchema, CartItemListResponseSchema
+from schemas.carts import (
+    CartCreationResponseSchema,
+    CartCreationRequestSchema,
+    CartItemAddRequestSchema,
+    CartItemAddResponseSchema,
+    CartItemRemoveRequestSchema,
+    MessageResponseSchema,
+    CartClearRequestSchema,
+    CartItemListRequestSchema,
+    CartItemListResponseSchema
+)
 
 
 async def create_cart_logic(
@@ -84,7 +92,7 @@ async def add_cart_item_logic(
     is returned.
 
     Args:
-        cart_item_data (CartItemAddRequestSchema): The user id and item id are needed.
+        cart_item_data (CartItemAddRequestSchema): The cart id and movie id are needed.
         db (AsyncSession): The asynchronous database session.
 
     Returns:
@@ -105,18 +113,18 @@ async def add_cart_item_logic(
             detail=f"A shopping cart {cart_item_data.cart_id} does not exists."
         )
 
-    current_cart_item_exists = select(MovieModel.id).where(MovieModel.id == cart_item_data.cart_item_id)
+    current_cart_item_exists = select(MovieModel.id).where(MovieModel.id == cart_item_data.movie_id)
     result = await db.execute(current_cart_item_exists)
     current_cart_item_found = result.scalars().first()
     if not current_cart_item_found:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Movie ID {cart_item_data.cart_item_id} does not exists."
+            detail=f"Movie ID {cart_item_data.movie_id} does not exists."
         )
 
     current_cart_item = select(CartItemModel).where(
         and_(
-            CartItemModel.movie_id == cart_item_data.cart_item_id,
+            CartItemModel.movie_id == cart_item_data.movie_id,
             CartItemModel.cart_id == cart_item_data.cart_id
         )
     )
@@ -127,14 +135,14 @@ async def add_cart_item_logic(
     if existing_cart_item:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Conflict - the item ID {cart_item_data.cart_item_id} is already added to "
+            detail=f"Conflict - the item ID {cart_item_data.movie_id} was already added to "
                    f"the shopping card ID {cart_item_data.cart_id}."
         )
 
     try:
         new_cart_item = CartItemModel(
             cart_id=cart_item_data.cart_id,
-            movie_id=cart_item_data.cart_item_id,
+            movie_id=cart_item_data.movie_id,
         )
         db.add(new_cart_item)
         await db.commit()
@@ -162,7 +170,7 @@ async def remove_cart_item_logic(
     is returned.
 
     Args:
-        cart_item_data (CartItemRemoveRequestSchema): The user id and item id are needed.
+        cart_item_data (CartItemRemoveRequestSchema): The user id and movie id are needed.
         db (AsyncSession): The asynchronous database session.
 
     Returns:
@@ -182,35 +190,46 @@ async def remove_cart_item_logic(
             detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
         )
 
-    stmt = select(CartItemModel).where(CartItemModel.id == cart_item_data.cart_item_id)
+    stmt = select(CartItemModel).where(CartItemModel.movie_id == cart_item_data.movie_id)
     result = await db.execute(stmt)
     cart_item = result.scalars().first()
 
     if not cart_item:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"CartItem ID {cart_item_data.cart_item_id} not found."
+            detail=f"Movie ID {cart_item_data.movie_id} not found."
         )
 
-    if cart_item.cart_id != cart_item_data.cart_id:
+
+    exact_item = select(CartItemModel).where(
+        and_(
+            CartItemModel.movie_id == cart_item_data.movie_id,
+            CartItemModel.cart_id == cart_item_data.cart_id
+
+        )
+    )
+    result = await db.execute(exact_item)
+    exact_cart_item = result.scalars().first()
+
+    if not exact_cart_item:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Item ID {cart_item_data.cart_item_id} not found in cart ID {cart_item_data.cart_id}."
+            detail=f"Item ID {cart_item_data.movie_id} not found in cart ID {cart_item_data.cart_id}."
         )
 
     try:
-        if not cart_item:
+        if not exact_cart_item:
             raise HTTPException(status_code=404, detail="Cart item not found. Surprise - it was checked.")
-        await db.delete(cart_item)
+        await db.delete(exact_cart_item)
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred during deleting an item from the shopping cart."
+            detail="An error occurred during deleting the movie from the shopping cart."
         ) from e
     else:
-        message_str = f"Item {cart_item_data.cart_item_id} has been successfully removed from the cart ID {cart_item_data.cart_id}."
+        message_str = f"Movie ID {cart_item_data.movie_id} has been successfully removed from the cart ID {cart_item_data.cart_id}."
         return MessageResponseSchema(message=message_str)
 
 
@@ -280,11 +299,6 @@ async def retrieve_cart_content_list_logic(
     cart_data: CartItemListRequestSchema,
     db: AsyncSession = Depends(get_db),
 ) -> list[CartItemListResponseSchema]:
-    # result = await db.execute(
-    #     select(CartItemModel)
-    #     .options(selectinload(CartItemModel.movie))
-    #     .where(CartItemModel.cart_id == cart_data.cart_id)
-    # )
 
     cart_items = await db.execute(
         select(CartItemModel)
