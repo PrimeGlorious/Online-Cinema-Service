@@ -10,8 +10,7 @@ import os
 
 from starlette.responses import JSONResponse
 
-from config import get_current_user
-from config.dependencies import require_admin
+from config.dependencies.custom import get_current_user, require_admin
 from database import get_db, UserModel
 from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
 from database.models.payments import Payment, PaymentStatusEnum
@@ -33,7 +32,7 @@ async def create_payment_session(
 ) -> StripePaymentResponseSchema:
     result = await db.execute(
         select(OrderModel)
-        .options(selectinload(OrderModel.items).selectinload(OrderItem.movie))
+        .options(selectinload(OrderModel.order_items).selectinload(OrderItem.movie))
         .where(OrderModel.id == order_id)
     )
     order = result.scalar_one_or_none()
@@ -43,7 +42,7 @@ async def create_payment_session(
     if order.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can pay only for your orders")
 
-    actual_total = sum(item.movie.price for item in order.items)
+    actual_total = sum(item.movie.price for item in order.order_items)
     if actual_total != order.total_amount:
         raise HTTPException(
             status_code=409, detail="Order total has changed. Please try again."
@@ -79,7 +78,7 @@ async def create_payment_session(
                 "price_data": {
                     "currency": "usd",
                     "product_data": {
-                        "name": ", ".join([item.movie.name for item in order.items])
+                        "name": ", ".join([item.movie.name for item in order.order_items])
                     },
                     "unit_amount": int(order.total_amount * 100),
                 },

@@ -246,11 +246,11 @@ async def add_cart_item(
     status_code=status.HTTP_200_OK,
     responses={
         400: {
-            "description": "There is no the item in the shopping cart.",
+            "description": "The shopping cart is empty.",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "There is no the item in the shopping cart."
+                        "detail": "The shopping cart is empty."
                     }
                 }
             },
@@ -301,25 +301,44 @@ async def remove_cart_item(
             detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
         )
 
-    current_cart_item = select(CartItemModel).where(
-        and_(
-            CartItemModel.id == cart_item_data.cart_item_id,
-            CartItemModel.cart_id == cart_item_data.cart_id
-        )
-    )
+    logger.info("304 cart_item_id" + str(cart_item_data.cart_item_id))
+    logger.info("305 cart_id" + str(cart_item_data.cart_id))
+    # current_cart_item = select(CartItemModel).where(
+    #     and_(
+    #         CartItemModel.id == cart_item_data.cart_item_id,
+    #         CartItemModel.cart_id == cart_item_data.cart_id
+    #     )
+    # )
+    #
+    # result = await db.execute(current_cart_item)
+    # existing_cart_item = result.scalars().first()
+    # if not existing_cart_item:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_400_BAD_REQUEST,
+    #         detail=f"There is no such an item in the shopping cart ID {cart_item_data.cart_id}."
+    #     )
 
-    result = await db.execute(current_cart_item)
-    existing_cart_item = result.scalars().first()
-    if not existing_cart_item:
+    stmt = select(CartItemModel).where(CartItemModel.id == cart_item_data.cart_item_id)
+    result = await db.execute(stmt)
+    cart_item = result.scalars().first()
+
+    if not cart_item:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"There is no such an item in the shopping cart ID {cart_item_data.cart_id}."
+            detail=f"CartItem ID {cart_item_data.cart_item_id} not found."
         )
-    try:
 
-        if not existing_cart_item:
+    if cart_item.cart_id != cart_item_data.cart_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Item ID {cart_item_data.cart_item_id} not found in cart ID {cart_item_data.cart_id}."
+        )
+
+    try:
+        logger.info("321 cart_item_id" + str(cart_item_data.cart_id))
+        if not cart_item:
             raise HTTPException(status_code=404, detail="Cart item not found. Surprise - it was checked.")
-        await db.delete(existing_cart_item)
+        await db.delete(cart_item)
         await db.commit()
     except SQLAlchemyError as e:
         await db.rollback()
@@ -328,7 +347,7 @@ async def remove_cart_item(
             detail="An error occurred during deleting an item from the shopping cart."
         ) from e
     else:
-        message_str = f"Item {cart_item_data.cart_item_id} has been  successfully deleted."
+        message_str = f"Item {cart_item_data.cart_item_id} has been successfully removed from the cart ID {cart_item_data.cart_id}."
         return MessageResponseSchema(message=message_str)
 
 

@@ -7,9 +7,8 @@ from fastapi import APIRouter, status, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_current_user
-from config.dependencies import require_admin
-from database import get_db, UserModel
+from config.dependencies.custom import get_current_user, require_admin
+from database import get_db, UserModel, MovieModel
 from database.models.carts import CartItemModel, CartModel
 from database.models.orders import OrderItem, OrderModel, OrderStatusEnum
 from schemas.orders import OrderCreateSchema, OrderReadSchema
