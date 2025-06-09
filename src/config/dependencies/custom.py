@@ -2,6 +2,7 @@ from fastapi import Depends, Request, status, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import get_jwt_auth_manager
 from database import UserModel, get_db, UserGroupEnum
 from security.http import get_token
 from security.token_manager import JWTAuthManager
