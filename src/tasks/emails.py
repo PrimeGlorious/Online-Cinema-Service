@@ -1,5 +1,6 @@
 print("=== tasks/emails.py LOADED ===")
 
+from config.settings import Settings
 from celery import shared_task
 import asyncio
 
@@ -19,7 +20,6 @@ def send_activation_email_task(email: str, activation_link: str):
     """
     settings = get_settings()
     sender = get_accounts_email_notificator(settings)
-    # Run async send_activation_email in sync context
     asyncio.run(sender.send_activation_email(email, activation_link))
 
 
@@ -42,3 +42,17 @@ def delete_expired_activation_tokens():
         db.commit()
     finally:
         db.close()
+
+
+@shared_task
+def send_password_reset_email_task(email: str, reset_link: str):
+    settings = get_settings()
+    sender = get_accounts_email_notificator(settings)
+    asyncio.run(sender.send_password_reset_email(email, reset_link))
+
+
+@shared_task
+def send_password_reset_complete_email_task(email: str, login_link: str):
+    settings = get_settings()
+    sender = get_accounts_email_notificator(settings)
+    asyncio.run(sender.send_password_reset_complete_email(email, login_link))

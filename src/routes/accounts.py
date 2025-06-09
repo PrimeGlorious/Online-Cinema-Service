@@ -5,13 +5,16 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_jwt_auth_manager
-from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel
+from config import get_jwt_auth_manager, get_settings
+from config.dependencies.custom import get_current_user
+from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
+    PasswordResetTokenModel
 
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
-    LogoutRequestSchema
-from tasks.emails import send_activation_email_task, send_activation_complete_email_task
+    LogoutRequestSchema, ChangePasswordRequest, PasswordResetConfirmSchema, PasswordResetRequestSchema
+from tasks.emails import send_activation_email_task, send_activation_complete_email_task, \
+    send_password_reset_complete_email_task, send_password_reset_email_task
 
 router = APIRouter()
 
@@ -286,4 +289,97 @@ async def logout(
     # Delete the token and commit changes
     await db.delete(refresh_token_obj)
     await db.commit()
-    return
+    return {"message": "Logged out"}
+
+
+@router.post("/change-password/", status_code=204)
+async def change_password(
+    data: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user)
+):
+    # Check the old password
+    if not current_user.verify_password(data.old_password):
+        raise HTTPException(status_code=400, detail="Incorrect old password")
+
+    # Check that the new password is different from the old one
+    if data.old_password == data.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from old password")
+
+    # Set the new password
+    current_user.password = data.new_password
+    db.add(current_user)
+    await db.commit()
+    return {"message": "Password changed successfully"}
+
+
+@router.post("/reset-password-request/", status_code=204)
+async def reset_password_request(
+    data: PasswordResetRequestSchema,
+    db: AsyncSession = Depends(get_db),
+    settings = Depends(get_settings)
+):
+    result = await db.execute(
+        select(UserModel)
+        .options(selectinload(UserModel.password_reset_token))
+        .where(UserModel.email == data.email)
+    )
+    user = result.scalar_one_or_none()
+    if user is None or not user.is_active:
+        return
+
+    # Remove previous reset token
+    if user.password_reset_token:
+        await db.delete(user.password_reset_token)
+        await db.commit()
+
+    # Create new token
+    token_obj = PasswordResetTokenModel(user_id=user.id)
+    db.add(token_obj)
+    await db.commit()
+    await db.refresh(token_obj)
+
+    # Link
+    frontend_url = "https://localhost:8000/api/v1/accounts/reset-password/"
+    reset_link = f"{frontend_url}{token_obj.token}"
+
+    # Send email async (Celery)
+    send_password_reset_email_task.delay(user.email, reset_link)
+    return {"message": "Password reset link sent"}
+
+
+@router.post("/reset-password/", status_code=204)
+async def reset_password(
+    data: PasswordResetConfirmSchema,
+    db: AsyncSession = Depends(get_db),
+    settings = Depends(get_settings)
+):
+    # Retrieve the password reset token from the database
+    result = await db.execute(
+        select(PasswordResetTokenModel).where(PasswordResetTokenModel.token == data.token)
+    )
+    token_obj = result.scalar_one_or_none()
+
+    # Check if the token exists and is not expired
+    if token_obj is None or token_obj.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    # Retrieve the user by user_id from the token
+    result = await db.execute(
+        select(UserModel).where(UserModel.id == token_obj.user_id)
+    )
+    user = result.scalar_one()
+
+    # Set the new password (validates and hashes automatically)
+    user.password = data.new_password
+    db.add(user)
+
+    # Remove the used token
+    await db.delete(token_obj)
+    await db.commit()
+
+    # Send password reset completion email with login link (async via Celery)
+    login_link = "https://localhost:8000/api/v1/accounts/login"
+    send_password_reset_complete_email_task.delay(user.email, login_link)
+
+    return {"message": "Password reset successfully"}
