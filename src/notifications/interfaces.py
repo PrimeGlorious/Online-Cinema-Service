@@ -46,3 +46,15 @@ class EmailSenderInterface(ABC):
             login_link (str): The login link to include in the email.
         """
         pass
+
+    @abstractmethod
+    async def send_payment_confirmation_email(self, email: str, amount: float, order_id: int) -> None:
+        """
+        Asynchronously send a payment confirmation email.
+
+        Args:
+            email (str): The recipient's email address.
+            amount (float): The payment amount.
+            order_id (int): The order this payment is linked to.
+        """
+        pass

@@ -10,10 +10,12 @@ import os
 
 from starlette.responses import JSONResponse
 
+from config import get_accounts_email_notificator
 from config.dependencies.custom import get_current_user, require_admin
 from database import get_db, UserModel
 from database.models.orders import OrderModel, OrderItem, OrderStatusEnum
 from database.models.payments import Payment, PaymentStatusEnum
+from notifications import EmailSenderInterface
 from schemas.payments import (
     StripePaymentResponseSchema,
     PaymentReadSchema,
@@ -104,6 +106,7 @@ async def stripe_webhook(
     request: Request,
     stripe_signature: str = Header(None),
     db: AsyncSession = Depends(get_db),
+    email_sender: EmailSenderInterface = Depends(get_accounts_email_notificator),
 ):
     payload = await request.body()
     endpoint_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
@@ -130,6 +133,17 @@ async def stripe_webhook(
             payment.status = PaymentStatusEnum.SUCCESSFUL
             payment.order.status = OrderStatusEnum.PAID
             await db.commit()
+
+            result = await db.execute(
+                select(UserModel.email).where(UserModel.id == payment.order.user_id)
+            )
+            user_email = result.scalar_one()
+
+            await email_sender.send_payment_confirmation_email(
+                email=user_email,
+                amount=payment.amount,
+                order_id=payment.order.id
+            )
 
     elif event["type"] == "checkout.session.expired":
         session = event["data"]["object"]
