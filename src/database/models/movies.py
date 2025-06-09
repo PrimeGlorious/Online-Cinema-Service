@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy import (
     String,
     Integer,
@@ -99,7 +101,12 @@ class MovieModel(Base):
     __tablename__ = "movies"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    uuid: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    uuid: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        nullable=False,
+        default=lambda: str(uuid.uuid4())
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     year: Mapped[int] = mapped_column(Integer, nullable=False)
     time: Mapped[int] = mapped_column(Integer, nullable=False)
