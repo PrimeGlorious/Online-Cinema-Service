@@ -18,7 +18,7 @@ from crud.stars import (
 )
 
 
-router = APIRouter(prefix="/stars", tags=["Stars"])
+router = APIRouter(prefix="/stars")
 
 
 @router.get("/", response_model=StarListResponseSchema)

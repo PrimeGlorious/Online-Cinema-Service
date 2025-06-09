@@ -30,10 +30,10 @@ async def ratelimit_error(request: Request, exc: RateLimitExceeded):
 
 api_version_prefix = "/api/v1"
 
-app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(stars_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(genres_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["theater"])
-app.include_router(orders_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(payments_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(carts_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
+app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["Movies"])
+app.include_router(stars_router, prefix=f"{api_version_prefix}/theater", tags=["Stars"])
+app.include_router(genres_router, prefix=f"{api_version_prefix}/theater", tags=["Genres"])
+app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["Accounts"])
+app.include_router(orders_router, prefix=f"{api_version_prefix}/theater", tags=["Orders"])
+app.include_router(payments_router, prefix=f"{api_version_prefix}/theater", tags=["Payments"])
+app.include_router(carts_router, prefix=f"{api_version_prefix}/theater", tags=["Carts"])
