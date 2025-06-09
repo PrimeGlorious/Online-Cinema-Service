@@ -62,6 +62,20 @@ class MovieListItemSchema(BaseModel):
     }
 
 
+class MovieListItemFiltersSchema(BaseModel):
+    name: str
+    year: int
+    time: int
+    imdb: Decimal
+    votes: int
+    meta_score: Decimal
+    price: Decimal
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+
 class MovieListResponseSchema(BaseModel):
     movies: List[MovieListItemSchema]
     prev_page: Optional[str]
