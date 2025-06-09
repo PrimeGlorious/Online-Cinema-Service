@@ -24,11 +24,19 @@ router = APIRouter()
     description="Create a new order.",
     status_code=status.HTTP_201_CREATED,
 )
-async def register_user(
+async def create_order(
     data: OrderCreateSchema,
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> OrderReadSchema:
+    print("curent_user_id", current_user.id)
+    cart_stmt = await db.execute(
+        select(CartModel).where(CartModel.user_id == current_user.id)
+    )
+    cart = cart_stmt.scalar_one_or_none()
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found for user.")
+
     cart_stmt = await db.execute(
         select(CartItemModel.movie_id)
         .join(CartModel)
@@ -78,30 +86,44 @@ async def register_user(
         )
 
     stmt_price = await db.execute(
-        select(MovieModel.price).where(MovieModel.id.in_(movie_ids_to_order))
+        select(MovieModel.id, MovieModel.price).where(MovieModel.id.in_(movie_ids_to_order))
     )
     movie_price_map = {movie_id: price for movie_id, price in stmt_price.all()}
     total_amount = sum(movie_price_map.values())
 
-    order = OrderModel(
-        user_id=current_user.id,
-        status=OrderStatusEnum.PENDING,
-        created_at=datetime.utcnow(),
-        total_amount=total_amount,
-    )
-    db.add(order)
-    await db.flush()
-
-    order.items = [
-        OrderItem(
-            order_id=order.id,
-            movie_id=movie_id,
-            price_at_order=movie_price_map[movie_id],
+    try:
+        order = OrderModel(
+            user_id=current_user.id,
+            status=OrderStatusEnum.PENDING,
+            created_at=datetime.utcnow(),
+            total_amount=total_amount,
         )
-        for movie_id in movie_ids_to_order
-    ]
-    await db.commit()
-    await db.refresh(order)
+        db.add(order)
+        await db.flush()
+
+        order_items = [
+            OrderItem(
+                order_id=order.id,
+                movie_id=movie_id,
+                price_at_order=movie_price_map[movie_id],
+            )
+            for movie_id in movie_ids_to_order
+        ]
+        db.add_all(order_items)
+        await db.flush()
+        await db.commit()
+
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.order_items))
+            .where(OrderModel.id == order.id)
+        )
+        result = await db.execute(stmt)
+        order = result.scalar_one()
+
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create order: {str(e)}")
 
     return OrderReadSchema.model_validate(order)
 
@@ -119,7 +141,7 @@ async def list_all_orders(
     from_date: Optional[datetime] = Query(None),
     to_date: Optional[datetime] = Query(None),
 ) -> List[OrderReadSchema]:
-    stmt = select(OrderModel).options(selectinload(OrderModel.items))
+    stmt = select(OrderModel).options(selectinload(OrderModel.order_items))
 
     if status:
         stmt = stmt.where(OrderModel.status == status)
@@ -145,7 +167,7 @@ async def list_my_orders(
 ) -> List[OrderReadSchema]:
     stmt = (
         select(OrderModel)
-        .options(selectinload(OrderModel.items))
+        .options(selectinload(OrderModel.order_items))
         .where(OrderModel.user_id == current_user.id)
     )
 
@@ -169,7 +191,7 @@ async def get_my_order(
 ) -> OrderReadSchema:
     stmt = (
         select(OrderModel)
-        .options(selectinload(OrderModel.items))
+        .options(selectinload(OrderModel.order_items))
         .where(OrderModel.id == order_id)
     )
     result = await db.execute(stmt)
