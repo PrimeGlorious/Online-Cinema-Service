@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 
-from crud.movies import movie_list, movie_create, movie_item, movie_update
+from crud.movies import movie_list, movie_create, movie_item, movie_update, movie_delete
 from schemas.movies import (
     MovieListResponseSchema,
     MovieDetailResponseSchema,
@@ -125,5 +125,38 @@ async def update_movie(
     return await movie_update(
         movie_id=movie_id,
         movie_data=movie_data,
+        db=db,
+    )
+
+
+@router.delete(
+    "/movies/{movie_id}/",
+    summary="Delete a movie by ID",
+    description=(
+            "<h3>Delete a specific movie from the database by its unique ID.</h3>"
+            "<p>If the movie exists, it will be deleted. If it does not exist, "
+            "a 404 error will be returned.</p>"
+    ),
+    responses={
+        204: {
+            "description": "Movie deleted successfully."
+        },
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        },
+    },
+    status_code=204
+)
+async def delete_movie(
+        movie_id: int,
+        db: AsyncSession = Depends(get_db),
+):
+    return await movie_delete(
+        movie_id=movie_id,
         db=db,
     )
