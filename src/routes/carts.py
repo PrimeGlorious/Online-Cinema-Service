@@ -4,12 +4,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, joinedload
 from loguru import logger
-from config import get_jwt_auth_manager, BaseAppSettings, get_accounts_email_notificator
 from database import (
-    get_db, MovieModel, UserModel,
+    get_db,
+    MovieModel,
+    UserModel,
 )
-from exceptions import BaseSecurityError
-from notifications import EmailSenderInterface
 
 from schemas.carts import (
     CartCreationRequestSchema,
@@ -17,7 +16,6 @@ from schemas.carts import (
     CartItemAddResponseSchema,
     CartItemAddRequestSchema,
     CartItemRemoveRequestSchema,
-    CartItemRemoveResponseSchema,
     MessageResponseSchema,
     CartClearRequestSchema,
     CartItemListResponseSchema,
@@ -199,7 +197,7 @@ async def add_cart_item(
     if not current_cart_item_found:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cart item ID {cart_item_data.cart_item_id} does not exists."
+            detail=f"Movie ID {cart_item_data.cart_item_id} does not exists."
         )
 
     current_cart_item = select(CartItemModel).where(
@@ -301,23 +299,6 @@ async def remove_cart_item(
             detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
         )
 
-    logger.info("304 cart_item_id" + str(cart_item_data.cart_item_id))
-    logger.info("305 cart_id" + str(cart_item_data.cart_id))
-    # current_cart_item = select(CartItemModel).where(
-    #     and_(
-    #         CartItemModel.id == cart_item_data.cart_item_id,
-    #         CartItemModel.cart_id == cart_item_data.cart_id
-    #     )
-    # )
-    #
-    # result = await db.execute(current_cart_item)
-    # existing_cart_item = result.scalars().first()
-    # if not existing_cart_item:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_400_BAD_REQUEST,
-    #         detail=f"There is no such an item in the shopping cart ID {cart_item_data.cart_id}."
-    #     )
-
     stmt = select(CartItemModel).where(CartItemModel.id == cart_item_data.cart_item_id)
     result = await db.execute(stmt)
     cart_item = result.scalars().first()
@@ -405,7 +386,7 @@ async def clear_cart(
             - 400 There is no items in the shopping cart.
             - 500 Internal Server Error if an error occurs during item removing.
     """
-    logger.info("388 ", str(cart_item_data.cart_id))
+
     current_cart = select(CartModel).where(CartModel.id == cart_item_data.cart_id)
     result = await db.execute(current_cart)
     existing_cart = result.scalars().first()
@@ -414,14 +395,13 @@ async def clear_cart(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
         )
-    logger.info("396 ", str(cart_item_data.cart_id))
+
     current_cart_items = select(CartItemModel).where(
         CartItemModel.cart_id == cart_item_data.cart_id
     )
-    logger.info("401")
+
     result = await db.execute(current_cart_items)
     existing_cart_items = result.scalars().all()
-    logger.info("403  ", str(existing_cart_items))
     if not existing_cart_items:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -433,8 +413,6 @@ async def clear_cart(
             delete(CartItemModel).where(CartItemModel.cart_id == cart_item_data.cart_id)
         )
         await db.commit()
-
-        logger.info("416")
     except SQLAlchemyError as e:
         await db.rollback()
         raise HTTPException(
@@ -485,17 +463,8 @@ async def retrieve_cart_content_list(
         .where(CartItemModel.cart_id == cart_data.cart_id)
     )
 
-    cart_items = await db.execute(
-        select(CartItemModel)
-        .options(
-            joinedload(CartItemModel.movie).joinedload(MovieModel.genres),
-        )
-        .where(CartItemModel.cart_id == 3)
-    )
-    logger.info("cart_data 504 ")
-    # print("cart_items 418 ", cart_items)
-    cart_items = cart_items.scalars().all()
-    # print("cart_items 420 ", cart_items)
+    cart_items = cart_items.unique().scalars().all()
+
     if not cart_items:
         raise HTTPException(status_code=404, detail="No movies found in the cart.")
 
@@ -503,9 +472,9 @@ async def retrieve_cart_content_list(
         CartItemListResponseSchema(
             cart_id=cart_item.cart_id,
             movie_name=cart_item.movie.name,
-            # movie_price=cart_item.movie.price,
+            movie_price=cart_item.movie.price,
             movie_genres=[genre.name for genre in cart_item.movie.genres],
-            movie_date=cart_item.movie.date
+            movie_year=cart_item.movie.year
         )
         for cart_item in cart_items
     ]

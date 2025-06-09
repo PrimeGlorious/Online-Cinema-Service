@@ -30,4 +30,4 @@ api_version_prefix = "/api/v1"
 app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(orders_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(payments_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(carts_router, prefix=f"{api_version_prefix}/cart", tags=["theater"])
+app.include_router(carts_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
