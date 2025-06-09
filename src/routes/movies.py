@@ -3,8 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 
-from crud.movies import movie_list
-from schemas.movies import MovieListResponseSchema
+from crud.movies import movie_list, movie_create, movie_item
+from schemas.movies import MovieListResponseSchema, MovieDetailResponseSchema, MovieCreateSchema
 
 router = APIRouter()
 
@@ -41,4 +41,19 @@ async def get_movie_list(
         db=db,
         page=page,
         per_page=per_page
+    )
+
+
+@router.post(
+    "/movies/",
+    response_model=MovieDetailResponseSchema,
+    status_code=201,
+)
+async def create_movie(
+        movie_data: MovieCreateSchema,
+        db: AsyncSession = Depends(get_db),
+) -> MovieDetailResponseSchema:
+    return await movie_create(
+        movie_data=movie_data,
+        db=db,
     )
