@@ -57,3 +57,28 @@ async def create_movie(
         movie_data=movie_data,
         db=db,
     )
+
+
+@router.get(
+    "/movies/{movie_id}/",
+    response_model=MovieDetailResponseSchema,
+    summary="Get movie details by ID",
+    responses={
+        404: {
+            "description": "Movie not found.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Movie with the given ID was not found."}
+                }
+            },
+        }
+    }
+)
+async def get_movie_by_id(
+        movie_id: int,
+        db: AsyncSession = Depends(get_db),
+) -> MovieDetailResponseSchema:
+    return await movie_item(
+        movie_id=movie_id,
+        db=db,
+    )
