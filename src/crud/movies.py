@@ -1,4 +1,6 @@
 from fastapi import HTTPException, Request
+from fastapi_filters import FilterValues
+from fastapi_filters.ext.sqlalchemy import apply_filters
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +26,7 @@ async def movie_list(
         request: Request,
         page: int,
         per_page: int,
+        filters: FilterValues,
         db: AsyncSession
 ) -> MovieListResponseSchema:
     """
@@ -37,6 +40,8 @@ async def movie_list(
         :type page: int
         :param per_page: The number of items to display per page (must be between 1 and 20).
         :type per_page: int
+        :param filters: Filtering criteria to apply to the query.
+        :type filters: FilterValues
         :param db: The async SQLAlchemy database session (provided via dependency injection).
         :type db: AsyncSession
 
@@ -44,10 +49,11 @@ async def movie_list(
         :rtype: MovieListResponseSchema
 
         :raises HTTPException: Raises a 404 error if no movies are found for the requested page.
-        """
+    """
     offset = (page - 1) * per_page
 
     count_stmt = select(func.count(MovieModel.id))
+    count_stmt = apply_filters(count_stmt, filters=filters)
     result_count = await db.execute(count_stmt)
     total_items = result_count.scalar() or 0
 
@@ -56,6 +62,7 @@ async def movie_list(
 
     order_by = MovieModel.default_order_by()
     stmt = select(MovieModel)
+    stmt = apply_filters(stmt, filters=filters)
     if order_by:
         stmt = stmt.order_by(*order_by)
 

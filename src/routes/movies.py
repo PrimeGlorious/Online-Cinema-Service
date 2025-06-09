@@ -1,4 +1,5 @@
 from fastapi import Query, Depends, Request, APIRouter
+from fastapi_filters import FilterValues, create_filters_from_model
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
@@ -8,7 +9,7 @@ from schemas.movies import (
     MovieListResponseSchema,
     MovieDetailResponseSchema,
     MovieCreateSchema,
-    MoviePatchSchema
+    MoviePatchSchema, MovieListItemSchema, MovieListItemFiltersSchema
 )
 
 
@@ -40,12 +41,14 @@ async def get_movie_list(
         request: Request,
         page: int = Query(1, ge=1, description="Page number (1-based index)"),
         per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        filters: FilterValues = Depends(create_filters_from_model(MovieListItemFiltersSchema)),
         db: AsyncSession = Depends(get_db),
 ) -> MovieListResponseSchema:
     return await movie_list(
         request=request,
         db=db,
         page=page,
+        filters=filters,
         per_page=per_page
     )
 
