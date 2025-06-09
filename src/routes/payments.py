@@ -65,8 +65,8 @@ async def create_payment_session(
 
     payment = Payment(
         order_id=order.id,
+        user_id=current_user.id,
         amount=order.total_amount,
-        currency="usd",
         status=PaymentStatusEnum.PENDING,
     )
     db.add(payment)
@@ -89,8 +89,8 @@ async def create_payment_session(
         ],
         mode="payment",
         metadata={"payment_id": str(payment.id)},
-        success_url="http://localhost:8000/payments/success",
-        cancel_url="http://localhost:8000/payments/cancel",
+        success_url="http://localhost:8000/api/v1/theater/payments/success",
+        cancel_url="http://localhost:8000/api/v1/theater/payments/cancel",
     )
 
     payment.stripe_payment_intent_id = session.payment_intent

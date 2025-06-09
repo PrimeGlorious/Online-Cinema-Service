@@ -31,7 +31,7 @@ class OrderItemReadSchema(BaseModel):
 class OrderReadSchema(BaseModel):
     id: int
     created_at: datetime
-    items: List[OrderItemReadSchema]
+    order_items: List[OrderItemReadSchema]
     total_amount: Decimal
     status: OrderStatusEnum
 
