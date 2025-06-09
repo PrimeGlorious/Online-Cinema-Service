@@ -1,17 +1,18 @@
 from fastapi import HTTPException, Request
 from fastapi_filters import FilterValues
 from fastapi_filters.ext.sqlalchemy import apply_filters
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
+from starlette import status
 
-from database import MovieModel
+from database import MovieModel, UserModel
 from database.models.movies import (
     CertificationModel,
     GenreModel,
     StarModel,
-    DirectorModel
+    DirectorModel, UserFavoriteMovieModel
 )
 
 from schemas.movies import (
@@ -27,7 +28,9 @@ async def movie_list(
         page: int,
         per_page: int,
         filters: FilterValues,
-        db: AsyncSession
+        db: AsyncSession,
+        user: UserModel | None = None,
+        only_favorites: bool = False
 ) -> MovieListResponseSchema:
     """
         Fetch a paginated list of movies from the database (asynchronously).
@@ -44,6 +47,10 @@ async def movie_list(
         :type filters: FilterValues
         :param db: The async SQLAlchemy database session (provided via dependency injection).
         :type db: AsyncSession
+        :param user: The current authenticated user (injected via Depends).
+        :type user: UserModel
+        :param only_favorites: Whether to return only user's favorite movies.
+        :type only_favorites: bool
 
         :return: A response containing the paginated list of movies and metadata.
         :rtype: MovieListResponseSchema
@@ -52,7 +59,23 @@ async def movie_list(
     """
     offset = (page - 1) * per_page
 
-    count_stmt = select(func.count(MovieModel.id))
+    stmt_base = select(MovieModel)
+
+    if only_favorites:
+        user_stmt = (
+            select(UserModel)
+            .options(selectinload(UserModel.favorite_movies))
+            .where(UserModel.id == user.id)
+        )
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one()
+
+        favorite_ids = [fav.movie_id for fav in user.favorite_movies]
+        if not favorite_ids:
+            raise HTTPException(status_code=404, detail="No favorite movies found.")
+        stmt_base = stmt_base.where(MovieModel.id.in_(favorite_ids))
+
+    count_stmt = stmt_base.with_only_columns(func.count()).order_by(None)
     count_stmt = apply_filters(count_stmt, filters=filters)
     result_count = await db.execute(count_stmt)
     total_items = result_count.scalar() or 0
@@ -60,9 +83,9 @@ async def movie_list(
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
 
+    stmt = apply_filters(stmt_base, filters=filters)
+
     order_by = MovieModel.default_order_by()
-    stmt = select(MovieModel)
-    stmt = apply_filters(stmt, filters=filters)
     if order_by:
         stmt = stmt.order_by(*order_by)
 
@@ -77,17 +100,15 @@ async def movie_list(
     movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
 
     total_pages = (total_items + per_page - 1) // per_page
-
     url = request.url.path
 
-    response = MovieListResponseSchema(
+    return MovieListResponseSchema(
         movies=movie_list,
         prev_page=f"{url}?page={page - 1}&per_page={per_page}" if page > 1 else None,
         next_page=f"{url}?page={page + 1}&per_page={per_page}" if page < total_pages else None,
         total_pages=total_pages,
         total_items=total_items,
     )
-    return response
 
 
 async def movie_create(
@@ -255,3 +276,59 @@ async def movie_delete(
     await db.commit()
 
     return {"detail": "Movie deleted successfully."}
+
+
+async def like_movie(user: UserModel, movie_id: int, db: AsyncSession) -> None:
+    """
+    Add a movie to the user's favorites list.
+
+    Args:
+        user (UserModel): The current authenticated user.
+        movie_id (int): The ID of the movie to add.
+        db (AsyncSession): The database session.
+
+    Raises:
+        HTTPException: If the movie is already in favorites or does not exist.
+    """
+    movie = await db.get(MovieModel, movie_id)
+    if movie is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
+
+    stmt = select(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    )
+    result = await db.execute(stmt)
+    if result.scalar():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already in favorites")
+
+    db.add(UserFavoriteMovieModel(user_id=user.id, movie_id=movie_id))
+    await db.commit()
+
+
+async def unlike_movie(user: UserModel, movie_id: int, db: AsyncSession) -> None:
+    """
+    Remove a movie from the user's favorites list.
+
+    Args:
+        user (UserModel): The current authenticated user.
+        movie_id (int): The ID of the movie to remove.
+        db (AsyncSession): The database session.
+
+    Raises:
+        HTTPException: If the movie is not in the favorites list.
+    """
+    stmt = select(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    )
+    result = await db.execute(stmt)
+    favorite = result.scalar()
+    if favorite is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Movie not in favorites")
+
+    await db.execute(delete(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    ))
+    await db.commit()
