@@ -97,6 +97,16 @@ class CertificationModel(Base):
         return f"<Certification(name='{self.name}')>"
 
 
+class UserFavoriteMovieModel(Base):
+    __tablename__ = "user_favorite_movies"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="favorite_movies")
+    movie: Mapped["MovieModel"] = relationship("MovieModel", back_populates="liked_by_users")
+
+
 class MovieModel(Base):
     __tablename__ = "movies"
 
@@ -145,6 +155,11 @@ class MovieModel(Base):
         uselist=False
     )
 
+    liked_by_users: Mapped[List["UserFavoriteMovieModel"]] = relationship(
+        "UserFavoriteMovieModel",
+        back_populates="movie",
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "year", "time", name="unique_movie_constraint"),
