@@ -88,3 +88,22 @@ class MovieCreateSchema(MovieBaseSchema):
     genres: List[str]
     directors: List[str]
     stars: List[str]
+
+
+class MoviePatchSchema(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    year: Optional[int] = Field(None, ge=1900)
+    time: Optional[int] = Field(None, gt=0)
+    imdb: Optional[float] = Field(None, ge=0)
+    votes: Optional[int] = Field(None, ge=0)
+    meta_score: Optional[float] = Field(None, ge=0)
+    gross: Optional[float] = Field(None, ge=0)
+    description: Optional[str] = None
+    price: Optional[Decimal] = Field(None, max_digits=10, decimal_places=2)
+
+    certification: Optional[str] = None
+    genres: Optional[List[str]] = None
+    directors: Optional[List[str]] = None
+    stars: Optional[List[str]] = None
+
+    model_config = ConfigDict(populate_by_name=True)
