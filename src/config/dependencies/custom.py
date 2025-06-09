@@ -90,16 +90,25 @@ async def require_admin(
     return user
 
 
-def require_moderator(
+async def require_moderator(
+        db: AsyncSession = Depends(get_db),
         current_user: UserModel = Depends(get_current_user)
 ) -> UserModel:
     """
     Dependency to ensure that the current user is a moderator or admin.
     Raises HTTP 403 if not.
     """
-    if current_user.group.name not in [UserGroupEnum.MODERATOR, UserGroupEnum.ADMIN]:
+    stmt = (
+        select(UserModel)
+        .options(selectinload(UserModel.group))
+        .where(UserModel.id == current_user.id)
+    )
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+
+    if not user or user.group.name not in [UserGroupEnum.MODERATOR, UserGroupEnum.ADMIN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Moderator or admin privileges required."
         )
-    return current_user
+    return user
