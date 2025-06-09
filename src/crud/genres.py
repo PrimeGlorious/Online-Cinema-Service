@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from database.models.movies import GenreModel
-from schemas.genres import GenreCreateSchema, GenreUpdateSchema
+from schemas.genres import GenreCreateSchema, GenreUpdateSchema, GenreDetailSchema
 
 
 async def get_genre_list_db(db: AsyncSession, page: int, per_page: int):
@@ -50,7 +50,8 @@ async def update_genre_db(db: AsyncSession, genre_id: int, genre_data: GenreUpda
     if not genre:
         raise HTTPException(status_code=404, detail="Genre not found.")
 
-    for field, value in genre_data.model_dump(exclude_unset=True).items():
+    update_data = genre_data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
         setattr(genre, field, value)
 
     try:

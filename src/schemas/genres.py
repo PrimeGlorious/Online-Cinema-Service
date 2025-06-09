@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List
 
 
@@ -14,10 +14,14 @@ class GenreListItemSchema(BaseModel):
     id: int
     name: str
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class GenreDetailSchema(BaseModel):
     id: int
     name: str
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GenreListResponseSchema(BaseModel):
