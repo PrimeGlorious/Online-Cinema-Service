@@ -192,7 +192,7 @@ async def login(
         )
 
     # Generate access and refresh tokens
-    payload = {"sub": user.email, "user_id": user.id}
+    payload = {"sub": str(user.id), "user_id": user.id}
     access_token = jwt_manager.create_access_token(payload)
     refresh_token = jwt_manager.create_refresh_token(payload)
 
@@ -249,7 +249,7 @@ async def refresh_token(
     # Delete the old refresh token, create a new one, commit
     await db.delete(refresh_token_obj)
 
-    payload = {"sub": user.email, "user_id": user.id}
+    payload = {"sub": str(user.id), "user_id": user.id}
     access_token = jwt_manager.create_access_token(payload)
     new_refresh_token = jwt_manager.create_refresh_token(payload)
     days_valid = 7
