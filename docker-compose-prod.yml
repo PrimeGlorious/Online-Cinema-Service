@@ -122,6 +122,41 @@ services:
     networks:
       - theater_network
 
+  celery_worker:
+    build: .
+    command: celery -A tasks.celery worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      SERVICE_ROLE: celery_worker
+    depends_on:
+      - db
+      - redis
+    networks:
+      - theater_network
+
+  celery_beat:
+    build: .
+    command: celery -A tasks.celery beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      SERVICE_ROLE: celery_beat
+    depends_on:
+      - db
+      - redis
+    networks:
+      - theater_network
+
+  redis:
+    image: redis:7-alpine
+    env_file:
+      - .env
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    networks:
+      - theater_network
+
 volumes:
   postgres_theater_data:
     driver: local
