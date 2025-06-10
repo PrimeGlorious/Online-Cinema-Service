@@ -128,6 +128,7 @@ services:
     networks:
       - theater_network_test
 
+
 volumes:
   minio_data_test:
     driver: local

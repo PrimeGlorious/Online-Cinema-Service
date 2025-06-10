@@ -157,6 +157,7 @@ services:
     networks:
       - theater_network
 
+
 volumes:
   postgres_theater_data:
     driver: local
