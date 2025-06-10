@@ -1,14 +1,16 @@
 from fastapi import Query, Depends, Request, APIRouter
+from fastapi_filters import FilterValues, create_filters_from_model
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
+from config.dependencies.custom import get_current_user
+from database import get_db, UserModel
 
-from crud.movies import movie_list, movie_create, movie_item, movie_update, movie_delete
+from crud.movies import movie_list, movie_create, movie_item, movie_update, movie_delete, like_movie, unlike_movie
 from schemas.movies import (
     MovieListResponseSchema,
     MovieDetailResponseSchema,
     MovieCreateSchema,
-    MoviePatchSchema
+    MoviePatchSchema, MovieListItemSchema, MovieListItemFiltersSchema
 )
 
 
@@ -40,12 +42,14 @@ async def get_movie_list(
         request: Request,
         page: int = Query(1, ge=1, description="Page number (1-based index)"),
         per_page: int = Query(10, ge=1, le=20, description="Number of items per page"),
+        filters: FilterValues = Depends(create_filters_from_model(MovieListItemFiltersSchema)),
         db: AsyncSession = Depends(get_db),
 ) -> MovieListResponseSchema:
     return await movie_list(
         request=request,
         db=db,
         page=page,
+        filters=filters,
         per_page=per_page
     )
 
@@ -159,4 +163,43 @@ async def delete_movie(
     return await movie_delete(
         movie_id=movie_id,
         db=db,
+    )
+
+
+@router.post("/favorites/{movie_id}/", status_code=201)
+async def add_to_favorites(
+    movie_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    await like_movie(user, movie_id, db)
+    return {"detail": "Movie added to favorites"}
+
+
+@router.delete("/favorites/{movie_id}/", status_code=204)
+async def remove_from_favorites(
+    movie_id: int,
+    user: UserModel = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    await unlike_movie(user, movie_id, db)
+
+
+@router.get("/favorites/", response_model=MovieListResponseSchema)
+async def list_favorite_movies(
+    request: Request,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(10, ge=1, le=20),
+    filters: FilterValues = Depends(create_filters_from_model(MovieListItemSchema)),
+    db: AsyncSession = Depends(get_db),
+    user: UserModel = Depends(get_current_user)
+):
+    return await movie_list(
+        request=request,
+        page=page,
+        per_page=per_page,
+        filters=filters,
+        db=db,
+        user=user,
+        only_favorites=True
     )

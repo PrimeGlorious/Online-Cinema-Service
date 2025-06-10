@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from sqlalchemy import (
     String,
@@ -7,7 +8,7 @@ from sqlalchemy import (
     Text,
     DECIMAL,
     ForeignKey,
-    UniqueConstraint
+    UniqueConstraint, DateTime, func
 )
 from sqlalchemy.orm import (
     relationship,
@@ -97,6 +98,16 @@ class CertificationModel(Base):
         return f"<Certification(name='{self.name}')>"
 
 
+class UserFavoriteMovieModel(Base):
+    __tablename__ = "user_favorite_movies"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), primary_key=True)
+
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="favorite_movies")
+    movie: Mapped["MovieModel"] = relationship("MovieModel", back_populates="liked_by_users")
+
+
 class MovieModel(Base):
     __tablename__ = "movies"
 
@@ -145,6 +156,17 @@ class MovieModel(Base):
         uselist=False
     )
 
+    liked_by_users: Mapped[List["UserFavoriteMovieModel"]] = relationship(
+        "UserFavoriteMovieModel",
+        back_populates="movie",
+        cascade="all, delete-orphan"
+    )
+
+    comments: Mapped[List["MovieCommentModel"]] = relationship(
+        "MovieCommentModel",
+        back_populates="movie",
+        cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         UniqueConstraint("name", "year", "time", name="unique_movie_constraint"),
@@ -173,3 +195,22 @@ class MovieStarModel(Base):
 
     movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id"), primary_key=True)
     star_id: Mapped[int] = mapped_column(ForeignKey("stars.id"), primary_key=True)
+
+
+class MovieCommentModel(Base):
+    __tablename__ = "movie_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+
+    user: Mapped["UserModel"] = relationship("UserModel")
+    movie: Mapped["MovieModel"] = relationship("MovieModel")
+
+    def __repr__(self):
+        return f"<MovieCommentModel(id={self.id}, user_id={self.user_id}, movie_id={self.movie_id})>"

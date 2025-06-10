@@ -37,7 +37,8 @@ class OrderModel(Base):
     payments: Mapped[List["Payment"]] = relationship("Payment", back_populates="order")
 
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="orders")
-    order_items: Mapped["OrderItem"] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+    order_items: Mapped[List["OrderItem"]] = relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
+
 
 class OrderItem(Base):
     __tablename__ = "order_items"

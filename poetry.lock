@@ -1013,6 +1013,28 @@ all = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>
 standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "jinja2 (>=2.11.2)", "python-multipart (>=0.0.7)", "uvicorn[standard] (>=0.12.0)"]
 
 [[package]]
+name = "fastapi-filters"
+version = "0.3.0"
+description = "fastapi-filters"
+optional = false
+python-versions = "<4.0,>=3.9"
+groups = ["main"]
+files = [
+    {file = "fastapi_filters-0.3.0-py3-none-any.whl", hash = "sha256:b6af5b9862319893f744b9fc677d737c1c26d1132fbf70dc2069f9355513b74b"},
+    {file = "fastapi_filters-0.3.0.tar.gz", hash = "sha256:bc63b6c607e7bf26a80580c2c80464f77120f772869333e919984299e7dc748d"},
+]
+
+[package.dependencies]
+fastapi = ">=0.100.0"
+pydantic = ">=2.0.0,<3.0.0"
+typing-extensions = ">=4.4.0,<5.0.0"
+
+[package.extras]
+all = ["sqlalchemy (>=2.0.0,<3.0.0)", "tortoise-orm (>=0.20,<0.25)"]
+sqlalchemy = ["sqlalchemy (>=2.0.0,<3.0.0)"]
+tortoise-orm = ["tortoise-orm (>=0.20,<0.25)"]
+
+[[package]]
 name = "flake8"
 version = "7.1.1"
 description = "the modular source code checker: pep8 pyflakes and co"
@@ -3111,4 +3133,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.10"
-content-hash = "81c3a0601917ca72da9c1c266486a26f87e620561969927b10c8beb01770e87a"
+content-hash = "49b7c35f33371ff1b2df0a999347f16ec92a9686fd0a01b33335f0a635fa58ed"
