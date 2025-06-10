@@ -10,36 +10,29 @@ from security.token_manager import JWTAuthManager
 
 
 async def get_current_user(
-        request: Request,
-        db: AsyncSession = Depends(get_db),
-        jwt_manager: JWTAuthManager = Depends(get_jwt_auth_manager)
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    jwt_manager: JWTAuthManager = Depends(get_jwt_auth_manager)
 ) -> UserModel:
     """
-    Dependency that extracts and validates the current user from the JWT access token in the request.
-
-    1. Extracts the Bearer token from the request headers.
-    2. Decodes and validates the access token using the JWT manager.
-    3. Retrieves the user from the database by user ID from the token payload.
-    4. Raises HTTP 401 if the token is invalid, user is not found, or user is inactive.
+    Retrieve and return the current active user with the user group loaded.
 
     Args:
         request (Request): FastAPI request object.
         db (AsyncSession): Async SQLAlchemy session dependency.
-        jwt_manager (JWTAuthManager): Dependency for managing JWT tokens.
+        jwt_manager (JWTAuthManager): JWT manager.
 
     Returns:
-        UserModel: The current active user.
+        UserModel: The current user instance with group relationship loaded.
 
     Raises:
-        HTTPException: If the token is missing, invalid, expired, or the user is not found or inactive.
+        HTTPException: If the token is missing, invalid, expired, or user not found or inactive.
     """
-    # Extract the token from the request
     try:
         token = get_token(request)
     except HTTPException:
         raise
 
-    # Decode the access token
     try:
         payload = jwt_manager.decode_access_token(token)
         user_id = payload.get("sub")
@@ -54,15 +47,17 @@ async def get_current_user(
             detail="Invalid or expired token"
         )
 
-    # Query the user from the database
-    result = await db.execute(select(UserModel).where(UserModel.id == int(user_id)))
+    result = await db.execute(
+        select(UserModel)
+        .options(selectinload(UserModel.group))
+        .where(UserModel.id == int(user_id))
+    )
     user = result.scalar_one_or_none()
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
-
     return user
 
 

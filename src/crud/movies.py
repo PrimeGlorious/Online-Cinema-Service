@@ -12,14 +12,16 @@ from database.models.movies import (
     CertificationModel,
     GenreModel,
     StarModel,
-    DirectorModel, UserFavoriteMovieModel
+    DirectorModel,
+    UserFavoriteMovieModel
 )
 
 from schemas.movies import (
     MovieListResponseSchema,
     MovieListItemSchema,
     MovieDetailResponseSchema,
-    MovieCreateSchema, MoviePatchSchema
+    MovieCreateSchema,
+    MoviePatchSchema
 )
 
 
@@ -278,7 +280,11 @@ async def movie_delete(
     return {"detail": "Movie deleted successfully."}
 
 
-async def like_movie(user: UserModel, movie_id: int, db: AsyncSession) -> None:
+async def like_movie(
+        user: UserModel,
+        movie_id: int,
+        db: AsyncSession
+) -> None:
     """
     Add a movie to the user's favorites list.
 
@@ -306,7 +312,11 @@ async def like_movie(user: UserModel, movie_id: int, db: AsyncSession) -> None:
     await db.commit()
 
 
-async def unlike_movie(user: UserModel, movie_id: int, db: AsyncSession) -> None:
+async def unlike_movie(
+        user: UserModel,
+        movie_id: int,
+        db: AsyncSession
+) -> None:
     """
     Remove a movie from the user's favorites list.
 
