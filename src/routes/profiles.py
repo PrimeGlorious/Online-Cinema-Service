@@ -9,7 +9,7 @@ from crud.profiles import (
 )
 from typing import List
 
-router = APIRouter(tags=["Profiles"])
+router = APIRouter()
 
 
 @router.get("/me", response_model=UserProfileRead)

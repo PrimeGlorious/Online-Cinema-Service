@@ -9,6 +9,7 @@ from routes.movies import router as movies_router
 from routes.genres import router as genres_router
 from routes.stars import router as stars_router
 from routes.accounts import router as accounts_router
+from routes.profiles import router as profiles_router
 from routes.orders import router as orders_router
 from routes.payments import router as payments_router
 
@@ -33,7 +34,8 @@ api_version_prefix = "/api/v1"
 app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(stars_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(genres_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
-app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["theater"])
+app.include_router(accounts_router, prefix=f"{api_version_prefix}/accounts", tags=["accounts"])
+app.include_router(profiles_router, prefix=f"{api_version_prefix}/profiles", tags=["profiles"])
 app.include_router(orders_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(payments_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
 app.include_router(carts_router, prefix=f"{api_version_prefix}/theater", tags=["theater"])
