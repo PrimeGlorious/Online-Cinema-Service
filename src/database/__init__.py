@@ -13,6 +13,13 @@ from database.models.accounts import (
 from database.models.movies import (
     MovieModel,
     GenreModel,
+    UserFavoriteMovieModel,
+    StarModel,
+    CertificationModel,
+    DirectorModel,
+    MovieGenreModel,
+    MovieStarModel,
+    MovieDirectorModel
 )
 from database.models.carts import (
     CartItemModel,
