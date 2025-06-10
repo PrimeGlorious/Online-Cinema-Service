@@ -1,9 +1,10 @@
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient
+from httpx._transports.asgi import ASGITransport
+from main import app
 from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# from config.settings import get_settings
 from config.settings_loader import get_settings
 from database import (
     reset_database,
@@ -28,11 +29,11 @@ async def reset_db():
     await reset_database()
 
 
-@pytest_asyncio.fixture(scope="function")
-async def client():
-    """Provide an asynchronous test client for making HTTP requests."""
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as async_client:
-        yield async_client
+# @pytest_asyncio.fixture(scope="function")
+# async def client():
+#     """Provide an asynchronous test client for making HTTP requests."""
+#     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as async_client:
+#         yield async_client
 
 
 @pytest_asyncio.fixture(scope="function")
@@ -100,3 +101,12 @@ async def seed_user_groups(db_session: AsyncSession):
     await db_session.execute(insert(UserGroupModel).values(groups))
     await db_session.commit()
     yield db_session
+
+
+@pytest_asyncio.fixture
+async def async_client() -> AsyncClient:
+    async with AsyncClient(
+        base_url="http://test",
+        transport=ASGITransport(app=app),
+    ) as client:
+        yield client
