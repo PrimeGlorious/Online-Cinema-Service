@@ -10,6 +10,7 @@ from routes.movies import router as movies_router
 from routes.genres import router as genres_router
 from routes.stars import router as stars_router
 from routes.accounts import router as accounts_router
+from routes.profiles import router as profiles_router
 from routes.orders import router as orders_router
 from routes.payments import router as payments_router
 from routes.comments import router as comments_router
@@ -58,6 +59,8 @@ async def ratelimit_error(request: Request, exc: RateLimitExceeded):
 
 api_version_prefix = "/api/v1"
 
+
+app.include_router(profiles_router, prefix=f"{api_version_prefix}/profiles", tags=["Profiles"])
 app.include_router(movies_router, prefix=f"{api_version_prefix}/theater", tags=["Movies"])
 app.include_router(comments_router, prefix=f"{api_version_prefix}/comments", tags=["Comments"])
 app.include_router(stars_router, prefix=f"{api_version_prefix}/theater", tags=["Stars"])

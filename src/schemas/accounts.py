@@ -95,7 +95,6 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
     new_password_repeat: str = Field(..., min_length=8)
 
-
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, value):
@@ -116,6 +115,11 @@ class PasswordResetConfirmSchema(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
     new_password_repeat: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password(cls, value):
+        return validate_password_strength(value)
 
     @model_validator(mode="after")
     def check_passwords_match(self):
