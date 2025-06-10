@@ -56,7 +56,12 @@ async def get_profile_by_id(db: AsyncSession, profile_id: int, current_user: Use
     return profile
 
 
-async def update_profile_by_id(db: AsyncSession, profile_id: int, profile_in: UserProfileUpdate, current_user: UserModel):
+async def update_profile_by_id(
+        db: AsyncSession,
+        profile_id: int,
+        profile_in: UserProfileUpdate,
+        current_user: UserModel
+):
     profile = await db.execute(
         select(UserProfileModel).where(UserProfileModel.id == profile_id)
     )

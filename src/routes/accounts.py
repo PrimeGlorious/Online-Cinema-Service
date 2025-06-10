@@ -316,8 +316,7 @@ async def change_password(
 @router.post("/reset-password-request/", status_code=204)
 async def reset_password_request(
     data: PasswordResetRequestSchema,
-    db: AsyncSession = Depends(get_db),
-    settings = Depends(get_settings)
+    db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
         select(UserModel)
@@ -351,8 +350,7 @@ async def reset_password_request(
 @router.post("/reset-password/", status_code=204)
 async def reset_password(
     data: PasswordResetConfirmSchema,
-    db: AsyncSession = Depends(get_db),
-    settings = Depends(get_settings)
+    db: AsyncSession = Depends(get_db)
 ):
     # Retrieve the password reset token from the database
     result = await db.execute(

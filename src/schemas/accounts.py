@@ -95,7 +95,6 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
     new_password_repeat: str = Field(..., min_length=8)
 
-
     @field_validator("new_password")
     @classmethod
     def validate_password(cls, value):

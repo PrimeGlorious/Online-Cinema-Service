@@ -3,9 +3,11 @@ from typing import Optional
 from datetime import date
 from enum import Enum
 
+
 class GenderEnum(str, Enum):
     MAN = "man"
     WOMAN = "woman"
+
 
 class UserProfileBase(BaseModel):
     first_name: Optional[str] = None
@@ -15,11 +17,14 @@ class UserProfileBase(BaseModel):
     date_of_birth: Optional[date] = None
     info: Optional[str] = None
 
+
 class UserProfileCreate(UserProfileBase):
     pass
 
+
 class UserProfileUpdate(UserProfileBase):
     pass
+
 
 class UserProfileRead(UserProfileBase):
     id: int
