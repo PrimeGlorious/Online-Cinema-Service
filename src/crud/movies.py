@@ -15,6 +15,7 @@ from database.models.movies import (
     DirectorModel,
     UserFavoriteMovieModel
 )
+from database.models.orders import OrderItem
 
 from schemas.movies import (
     MovieListResponseSchema,
@@ -24,90 +25,41 @@ from schemas.movies import (
     MoviePatchSchema
 )
 
-
 async def movie_list(
-        request: Request,
-        page: int,
-        per_page: int,
-        filters: FilterValues,
-        db: AsyncSession,
-        user: UserModel | None = None,
-        only_favorites: bool = False
+    request: Request,
+    page: int,
+    per_page: int,
+    filters: FilterValues,
+    db: AsyncSession,
+    user: UserModel | None = None,
+    only_favorites: bool = False
 ) -> MovieListResponseSchema:
-    """
-        Fetch a paginated list of movies from the database (asynchronously).
-
-        This function retrieves a paginated list of movies, allowing the client to specify
-        the page number and the number of items per page. It calculates the total pages
-        and provides links to the previous and next pages when applicable.
-
-        :param page: The page number to retrieve (1-based index, must be >= 1).
-        :type page: int
-        :param per_page: The number of items to display per page (must be between 1 and 20).
-        :type per_page: int
-        :param filters: Filtering criteria to apply to the query.
-        :type filters: FilterValues
-        :param db: The async SQLAlchemy database session (provided via dependency injection).
-        :type db: AsyncSession
-        :param user: The current authenticated user (injected via Depends).
-        :type user: UserModel
-        :param only_favorites: Whether to return only user's favorite movies.
-        :type only_favorites: bool
-
-        :return: A response containing the paginated list of movies and metadata.
-        :rtype: MovieListResponseSchema
-
-        :raises HTTPException: Raises a 404 error if no movies are found for the requested page.
-    """
     offset = (page - 1) * per_page
-
     stmt_base = select(MovieModel)
-
     if only_favorites:
-        user_stmt = (
-            select(UserModel)
-            .options(selectinload(UserModel.favorite_movies))
-            .where(UserModel.id == user.id)
-        )
-        user_result = await db.execute(user_stmt)
-        user = user_result.scalar_one()
-
-        favorite_ids = [fav.movie_id for fav in user.favorite_movies]
-        if not favorite_ids:
+        user_stmt = select(UserModel).options(selectinload(UserModel.favorite_movies)).where(UserModel.id == user.id)
+        user_obj = (await db.execute(user_stmt)).scalar_one()
+        fav_ids = [f.movie_id for f in user_obj.favorite_movies]
+        if not fav_ids:
             raise HTTPException(status_code=404, detail="No favorite movies found.")
-        stmt_base = stmt_base.where(MovieModel.id.in_(favorite_ids))
-
-    count_stmt = stmt_base.with_only_columns(func.count()).order_by(None)
-    count_stmt = apply_filters(count_stmt, filters=filters)
-    result_count = await db.execute(count_stmt)
-    total_items = result_count.scalar() or 0
-
-    if not total_items:
+        stmt_base = stmt_base.where(MovieModel.id.in_(fav_ids))
+    stmt_filtered = apply_filters(stmt_base, filters=filters)
+    count_stmt = stmt_filtered.with_only_columns(func.count(MovieModel.id)).order_by(None)
+    total_items = (await db.execute(count_stmt)).scalar_one()
+    if total_items == 0:
         raise HTTPException(status_code=404, detail="No movies found.")
-
-    stmt = apply_filters(stmt_base, filters=filters)
-
-    order_by = MovieModel.default_order_by()
-    if order_by:
-        stmt = stmt.order_by(*order_by)
-
-    stmt = stmt.offset(offset).limit(per_page)
-
-    result_movies = await db.execute(stmt)
-    movies = result_movies.scalars().all()
-
+    order_by = MovieModel.default_order_by() or []
+    page_stmt = stmt_filtered.order_by(*order_by).offset(offset).limit(per_page)
+    movies = (await db.execute(page_stmt)).scalars().all()
     if not movies:
         raise HTTPException(status_code=404, detail="No movies found.")
-
-    movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
-
+    items = [MovieListItemSchema.model_validate(m) for m in movies]
     total_pages = (total_items + per_page - 1) // per_page
     url = request.url.path
-
     return MovieListResponseSchema(
-        movies=movie_list,
-        prev_page=f"{url}?page={page - 1}&per_page={per_page}" if page > 1 else None,
-        next_page=f"{url}?page={page + 1}&per_page={per_page}" if page < total_pages else None,
+        movies=items,
+        prev_page=f"{url}?page={page-1}&per_page={per_page}" if page > 1 else None,
+        next_page=f"{url}?page={page+1}&per_page={per_page}" if page < total_pages else None,
         total_pages=total_pages,
         total_items=total_items,
     )
@@ -272,6 +224,16 @@ async def movie_delete(
         raise HTTPException(
             status_code=404,
             detail="Movie with the given ID was not found."
+        )
+
+    order_item_stmt = select(OrderItem).where(OrderItem.movie_id == movie_id)
+    order_item_result = await db.execute(order_item_stmt)
+    order_item = order_item_result.scalar_one_or_none()
+
+    if order_item:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete movie: it has been purchased by at least one user."
         )
 
     await db.delete(movie)

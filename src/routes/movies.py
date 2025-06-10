@@ -2,7 +2,7 @@ from fastapi import Query, Depends, Request, APIRouter
 from fastapi_filters import FilterValues, create_filters_from_model
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.dependencies.custom import get_current_user
+from config.dependencies.custom import get_current_user, require_moderator
 from database import get_db, UserModel
 
 from crud.movies import movie_list, movie_create, movie_item, movie_update, movie_delete, like_movie, unlike_movie
@@ -62,6 +62,7 @@ async def get_movie_list(
 async def create_movie(
         movie_data: MovieCreateSchema,
         db: AsyncSession = Depends(get_db),
+        user: UserModel = Depends(require_moderator)
 ) -> MovieDetailResponseSchema:
     return await movie_create(
         movie_data=movie_data,
@@ -125,6 +126,7 @@ async def update_movie(
         movie_id: int,
         movie_data: MoviePatchSchema,
         db: AsyncSession = Depends(get_db),
+        user: UserModel = Depends(require_moderator)
 ):
     return await movie_update(
         movie_id=movie_id,
@@ -159,6 +161,7 @@ async def update_movie(
 async def delete_movie(
         movie_id: int,
         db: AsyncSession = Depends(get_db),
+        user: UserModel = Depends(require_moderator)
 ):
     return await movie_delete(
         movie_id=movie_id,
