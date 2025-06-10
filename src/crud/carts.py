@@ -54,7 +54,6 @@ async def create_cart_logic(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"User ID {cart_data.user_id} doesn't exists."
         )
-
     current_cart = select(CartModel).where(CartModel.user_id == cart_data.user_id)
     result = await db.execute(current_cart)
     existing_cart = result.scalars().first()
@@ -199,7 +198,6 @@ async def remove_cart_item_logic(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Movie ID {cart_item_data.movie_id} not found."
         )
-
 
     exact_item = select(CartItemModel).where(
         and_(

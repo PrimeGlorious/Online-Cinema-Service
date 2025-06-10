@@ -1,17 +1,38 @@
 from fastapi import HTTPException, Request
-from sqlalchemy import select, func
+from fastapi_filters import FilterValues
+from fastapi_filters.ext.sqlalchemy import apply_filters
+from sqlalchemy import select, func, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
+from starlette import status
 
-from database import MovieModel
+from database import MovieModel, UserModel
+from database.models.movies import (
+    CertificationModel,
+    GenreModel,
+    StarModel,
+    DirectorModel,
+    UserFavoriteMovieModel
+)
 
-from schemas.movies import MovieListResponseSchema, MovieListItemSchema
+from schemas.movies import (
+    MovieListResponseSchema,
+    MovieListItemSchema,
+    MovieDetailResponseSchema,
+    MovieCreateSchema,
+    MoviePatchSchema
+)
 
 
 async def movie_list(
         request: Request,
         page: int,
         per_page: int,
-        db: AsyncSession
+        filters: FilterValues,
+        db: AsyncSession,
+        user: UserModel | None = None,
+        only_favorites: bool = False
 ) -> MovieListResponseSchema:
     """
         Fetch a paginated list of movies from the database (asynchronously).
@@ -24,25 +45,49 @@ async def movie_list(
         :type page: int
         :param per_page: The number of items to display per page (must be between 1 and 20).
         :type per_page: int
+        :param filters: Filtering criteria to apply to the query.
+        :type filters: FilterValues
         :param db: The async SQLAlchemy database session (provided via dependency injection).
         :type db: AsyncSession
+        :param user: The current authenticated user (injected via Depends).
+        :type user: UserModel
+        :param only_favorites: Whether to return only user's favorite movies.
+        :type only_favorites: bool
 
         :return: A response containing the paginated list of movies and metadata.
         :rtype: MovieListResponseSchema
 
         :raises HTTPException: Raises a 404 error if no movies are found for the requested page.
-        """
+    """
     offset = (page - 1) * per_page
 
-    count_stmt = select(func.count(MovieModel.id))
+    stmt_base = select(MovieModel)
+
+    if only_favorites:
+        user_stmt = (
+            select(UserModel)
+            .options(selectinload(UserModel.favorite_movies))
+            .where(UserModel.id == user.id)
+        )
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalar_one()
+
+        favorite_ids = [fav.movie_id for fav in user.favorite_movies]
+        if not favorite_ids:
+            raise HTTPException(status_code=404, detail="No favorite movies found.")
+        stmt_base = stmt_base.where(MovieModel.id.in_(favorite_ids))
+
+    count_stmt = stmt_base.with_only_columns(func.count()).order_by(None)
+    count_stmt = apply_filters(count_stmt, filters=filters)
     result_count = await db.execute(count_stmt)
     total_items = result_count.scalar() or 0
 
     if not total_items:
         raise HTTPException(status_code=404, detail="No movies found.")
 
+    stmt = apply_filters(stmt_base, filters=filters)
+
     order_by = MovieModel.default_order_by()
-    stmt = select(MovieModel)
     if order_by:
         stmt = stmt.order_by(*order_by)
 
@@ -57,14 +102,243 @@ async def movie_list(
     movie_list = [MovieListItemSchema.model_validate(movie) for movie in movies]
 
     total_pages = (total_items + per_page - 1) // per_page
-
     url = request.url.path
 
-    response = MovieListResponseSchema(
+    return MovieListResponseSchema(
         movies=movie_list,
         prev_page=f"{url}?page={page - 1}&per_page={per_page}" if page > 1 else None,
         next_page=f"{url}?page={page + 1}&per_page={per_page}" if page < total_pages else None,
         total_pages=total_pages,
         total_items=total_items,
     )
-    return response
+
+
+async def movie_create(
+        movie_data: MovieCreateSchema,
+        db: AsyncSession,
+) -> MovieDetailResponseSchema:
+    existing_stmt = select(MovieModel).where(
+        (MovieModel.name == movie_data.name),
+        (MovieModel.year == movie_data.year),
+        (MovieModel.time == movie_data.time)
+    )
+    existing_result = await db.execute(existing_stmt)
+    existing_movie = existing_result.scalars().first()
+
+    if existing_movie:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"A movie with the name '{movie_data.name}', release year {movie_data.year} and time "
+                f"'{movie_data.time}' already exists."
+            )
+        )
+
+    try:
+        certification_stmt = select(CertificationModel).where(CertificationModel.name == movie_data.certification)
+        certification_result = await db.execute(certification_stmt)
+        certification = certification_result.scalars().first()
+        if not certification:
+            certification = CertificationModel(name=movie_data.certification)
+            db.add(certification)
+            await db.flush()
+
+        genres = []
+        for genre_name in movie_data.genres:
+            genre_stmt = select(GenreModel).where(GenreModel.name == genre_name)
+            genre_result = await db.execute(genre_stmt)
+            genre = genre_result.scalars().first()
+
+            if not genre:
+                genre = GenreModel(name=genre_name)
+                db.add(genre)
+                await db.flush()
+            genres.append(genre)
+
+        stars = []
+        for star_name in movie_data.stars:
+            star_stmt = select(StarModel).where(StarModel.name == star_name)
+            star_result = await db.execute(star_stmt)
+            star = star_result.scalars().first()
+
+            if not star:
+                star = StarModel(name=star_name)
+                db.add(star)
+                await db.flush()
+            stars.append(star)
+
+        directors = []
+        for director_name in movie_data.directors:
+            director_stmt = select(DirectorModel).where(DirectorModel.name == director_name)
+            director_result = await db.execute(director_stmt)
+            director = director_result.scalars().first()
+
+            if not director:
+                director = DirectorModel(name=director_name)
+                db.add(director)
+                await db.flush()
+            directors.append(director)
+
+        movie = MovieModel(
+            name=movie_data.name,
+            year=movie_data.year,
+            time=movie_data.time,
+            imdb=movie_data.imdb,
+            votes=movie_data.votes,
+            meta_score=movie_data.meta_score,
+            gross=movie_data.gross,
+            description=movie_data.description,
+            price=movie_data.price,
+            certification=certification,
+            genres=genres,
+            directors=directors,
+            stars=stars,
+        )
+        db.add(movie)
+        await db.commit()
+        await db.refresh(movie, ["genres", "stars", "directors", "certification"])
+
+        return MovieDetailResponseSchema.model_validate(movie)
+
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+
+async def movie_item(
+        movie_id: int,
+        db: AsyncSession,
+):
+    stmt = (
+        select(MovieModel)
+        .options(
+            joinedload(MovieModel.certification),
+            joinedload(MovieModel.genres),
+            joinedload(MovieModel.stars),
+            joinedload(MovieModel.directors),
+        )
+        .where(MovieModel.id == movie_id)
+    )
+
+    result = await db.execute(stmt)
+    movie = result.scalars().first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404,
+            detail="Movie with the given ID was not found."
+        )
+
+    return MovieDetailResponseSchema.model_validate(movie)
+
+
+async def movie_update(
+        movie_id: int,
+        movie_data: MoviePatchSchema,
+        db: AsyncSession,
+):
+    stmt = select(MovieModel).where(MovieModel.id == movie_id)
+    result = await db.execute(stmt)
+    movie = result.scalars().first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404,
+            detail="Movie with the given ID was not found."
+        )
+
+    for field, value in movie_data.model_dump(exclude_unset=True).items():
+        setattr(movie, field, value)
+
+    try:
+        await db.commit()
+        await db.refresh(movie)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Invalid input data.")
+
+    return {"detail": "Movie updated successfully."}
+
+
+async def movie_delete(
+        movie_id: int,
+        db: AsyncSession,
+):
+    stmt = select(MovieModel).where(MovieModel.id == movie_id)
+    result = await db.execute(stmt)
+    movie = result.scalars().first()
+
+    if not movie:
+        raise HTTPException(
+            status_code=404,
+            detail="Movie with the given ID was not found."
+        )
+
+    await db.delete(movie)
+    await db.commit()
+
+    return {"detail": "Movie deleted successfully."}
+
+
+async def like_movie(
+        user: UserModel,
+        movie_id: int,
+        db: AsyncSession
+) -> None:
+    """
+    Add a movie to the user's favorites list.
+
+    Args:
+        user (UserModel): The current authenticated user.
+        movie_id (int): The ID of the movie to add.
+        db (AsyncSession): The database session.
+
+    Raises:
+        HTTPException: If the movie is already in favorites or does not exist.
+    """
+    movie = await db.get(MovieModel, movie_id)
+    if movie is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found")
+
+    stmt = select(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    )
+    result = await db.execute(stmt)
+    if result.scalar():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already in favorites")
+
+    db.add(UserFavoriteMovieModel(user_id=user.id, movie_id=movie_id))
+    await db.commit()
+
+
+async def unlike_movie(
+        user: UserModel,
+        movie_id: int,
+        db: AsyncSession
+) -> None:
+    """
+    Remove a movie from the user's favorites list.
+
+    Args:
+        user (UserModel): The current authenticated user.
+        movie_id (int): The ID of the movie to remove.
+        db (AsyncSession): The database session.
+
+    Raises:
+        HTTPException: If the movie is not in the favorites list.
+    """
+    stmt = select(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    )
+    result = await db.execute(stmt)
+    favorite = result.scalar()
+    if favorite is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Movie not in favorites")
+
+    await db.execute(delete(UserFavoriteMovieModel).where(
+        UserFavoriteMovieModel.user_id == user.id,
+        UserFavoriteMovieModel.movie_id == movie_id
+    ))
+    await db.commit()

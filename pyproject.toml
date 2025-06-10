@@ -39,6 +39,9 @@ colorama = "^0.4.6"
 stripe = "^12.2.0"
 slowapi = "^0.1.9"
 gunicorn = "^23.0.0"
+celery = "^5.5.3"
+redis = "^6.2.0"
+fastapi-filters = "^0.3.0"
 
 
 [build-system]
