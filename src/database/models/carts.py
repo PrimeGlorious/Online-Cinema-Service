@@ -15,7 +15,12 @@ class CartModel(Base):
 
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart", uselist=False)
 
-    cart_items: Mapped[list["CartItemModel"]] = relationship("CartItemModel", back_populates="cart", cascade="all, delete-orphan")
+    cart_items: Mapped[list["CartItemModel"]] = relationship(
+        "CartItemModel",
+        back_populates="cart",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 class CartItemModel(Base):
@@ -42,7 +47,7 @@ class CartItemModel(Base):
     )
     movie: Mapped["MovieModel"] = relationship(
         "MovieModel",
-        back_populates="cart_items"
+        back_populates="cart_items",
     )
     added_at: Mapped[datetime] = mapped_column(
         nullable=False,

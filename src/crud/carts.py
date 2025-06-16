@@ -1,3 +1,5 @@
+from typing import TypeVar, Type
+
 from fastapi import Depends, status, HTTPException
 from sqlalchemy import select, and_, delete
 from sqlalchemy.exc import SQLAlchemyError
@@ -21,6 +23,44 @@ from schemas.carts import (
     CartItemListRequestSchema,
     CartItemListResponseSchema
 )
+
+
+T = TypeVar("T")
+
+async def get_instance_or_404(
+    model: Type[T],
+    db: AsyncSession,
+    field: str,
+    value,
+    error_detail: str | None = None,
+) -> T:
+    """
+    Get an instance of a model by field and value or raise HTTP 404.
+
+    Args:
+        model (Type[T]): The SQLAlchemy model class.
+        db (AsyncSession): The database session.
+        field (str): Name of the column to filter by (e.g., 'id').
+        value (Any): The value to filter.
+        error_detail (str): Optional error detail to show in 404.
+
+    Returns:
+        instance of the model if found, otherwise raises HTTPException(404)
+    """
+    column_attr = getattr(model, field)
+    stmt = select(model).where(column_attr == value)
+    result = await db.execute(stmt)
+    instance = result.scalars().first()
+
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=error_detail or f"{model.__name__} with {field}={value} not found."
+        )
+    return instance
+
+
+
 
 
 async def create_cart_logic(
@@ -104,14 +144,13 @@ async def add_cart_item_logic(
             - 409 Conflict if the item is already in the shopping cart.
             - 500 Internal Server Error if an error occurs during item adding.
     """
-    current_cart = select(CartModel).where(CartModel.id == cart_item_data.cart_id)
-    result = await db.execute(current_cart)
-    existing_cart = result.scalars().first()
-    if not existing_cart:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"A shopping cart {cart_item_data.cart_id} does not exists."
-        )
+    _ = await get_instance_or_404(
+        CartModel,
+        db,
+        field="id",
+        value=cart_item_data.cart_id,
+        error_detail=f"A shopping cart ID {cart_item_data.cart_id} does not exist."
+    )
 
     current_cart_item_exists = select(MovieModel.id).where(MovieModel.id == cart_item_data.movie_id)
     result = await db.execute(current_cart_item_exists)
@@ -181,14 +220,13 @@ async def remove_cart_item_logic(
             - 400 There is no the item in the shopping cart.
             - 500 Internal Server Error if an error occurs during item removing.
     """
-    current_cart = select(CartModel).where(CartModel.id == cart_item_data.cart_id)
-    result = await db.execute(current_cart)
-    existing_cart = result.scalars().first()
-    if not existing_cart:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"A shopping cart ID {cart_item_data.cart_id} does not exists."
-        )
+    _ = await get_instance_or_404(
+        CartModel,
+        db,
+        field="id",
+        value=cart_item_data.cart_id,
+        error_detail=f"A shopping cart ID {cart_item_data.cart_id} does not exist."
+    )
 
     stmt = select(CartItemModel).where(CartItemModel.movie_id == cart_item_data.movie_id)
     result = await db.execute(stmt)
@@ -258,14 +296,13 @@ async def clear_cart_logic(
             - 500 Internal Server Error if an error occurs during item removing.
     """
 
-    current_cart = select(CartModel).where(CartModel.id == cart_data.cart_id)
-    result = await db.execute(current_cart)
-    existing_cart = result.scalars().first()
-    if not existing_cart:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"A shopping cart ID {cart_data.cart_id} does not exists."
-        )
+    _ = await get_instance_or_404(
+        CartModel,
+        db,
+        field="id",
+        value=cart_data.cart_id,
+        error_detail=f"A shopping cart ID {cart_data.cart_id} does not exist."
+    )
 
     current_cart_items = select(CartItemModel).where(
         CartItemModel.cart_id == cart_data.cart_id
