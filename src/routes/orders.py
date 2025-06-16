@@ -29,25 +29,20 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user),
 ) -> OrderReadSchema:
-    print("curent_user_id", current_user.id)
-    cart_stmt = await db.execute(
-        select(CartModel).where(CartModel.user_id == current_user.id)
+    stmt = await db.execute(
+        select(CartModel).options(selectinload(CartModel.cart_items)).where(CartModel.user_id == current_user.id)
     )
-    cart = cart_stmt.scalar_one_or_none()
+    cart = stmt.scalar_one_or_none()
+
     if not cart:
         raise HTTPException(status_code=404, detail="Cart not found for user.")
 
-    cart_stmt = await db.execute(
-        select(CartItemModel.movie_id)
-        .join(CartModel)
-        .where(CartModel.user_id == current_user.id)
-    )
-    cart_movie_ids = cart_stmt.scalars().all()
-
-    if not cart_movie_ids:
+    if not cart.cart_items:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Your shopping cart is empty."
         )
+
+    cart_movie_ids = [item.movie_id for item in cart.cart_items]
 
     bought_movie_ids = await get_user_movies_by_order_status(
         db=db, user_id=current_user.id, status=OrderStatusEnum.PAID
@@ -134,12 +129,12 @@ async def create_order(
     summary="Admin: List all orders with filters",
 )
 async def list_all_orders(
-    db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(require_admin),
-    status: Optional[OrderStatusEnum] = Query(None),
-    user_id: Optional[int] = Query(None),
-    from_date: Optional[datetime] = Query(None),
-    to_date: Optional[datetime] = Query(None),
+        db: AsyncSession = Depends(get_db),
+        current_user: UserModel = Depends(require_admin),
+        status: Optional[OrderStatusEnum] = Query(None),
+        user_id: Optional[int] = Query(None),
+        from_date: Optional[datetime] = Query(None),
+        to_date: Optional[datetime] = Query(None),
 ) -> List[OrderReadSchema]:
     stmt = select(OrderModel).options(selectinload(OrderModel.order_items))
 
@@ -161,9 +156,9 @@ async def list_all_orders(
     "/orders/", response_model=List[OrderReadSchema], summary="List user's own orders"
 )
 async def list_my_orders(
-    db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
-    status: Optional[OrderStatusEnum] = None,
+        db: AsyncSession = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
+        status: Optional[OrderStatusEnum] = None,
 ) -> List[OrderReadSchema]:
     stmt = (
         select(OrderModel)
@@ -185,9 +180,9 @@ async def list_my_orders(
     summary="Get one of user's own orders",
 )
 async def get_my_order(
-    order_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user),
+        order_id: int,
+        db: AsyncSession = Depends(get_db),
+        current_user: UserModel = Depends(get_current_user),
 ) -> OrderReadSchema:
     stmt = (
         select(OrderModel)
