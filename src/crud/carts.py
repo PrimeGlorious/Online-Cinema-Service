@@ -228,17 +228,6 @@ async def remove_cart_item_logic(
         error_detail=f"A shopping cart ID {cart_item_data.cart_id} does not exist."
     )
 
-    stmt = select(CartItemModel).where(CartItemModel.movie_id == cart_item_data.movie_id)
-    result = await db.execute(stmt)
-    cart_item = result.scalars().first()
-
-    if not cart_item:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Movie ID {cart_item_data.movie_id} not found."
-        )
-
-
     exact_item = select(CartItemModel).where(
         and_(
             CartItemModel.movie_id == cart_item_data.movie_id,
