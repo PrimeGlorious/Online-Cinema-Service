@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from config.dependencies.custom import get_current_user, get_db
-from database.models.accounts import UserModel
-from schemas.profiles import UserProfileCreate, UserProfileUpdate, UserProfileRead
+from database.models.accounts import UserModel, UserProfileModel
+from schemas.profiles import UserProfileCreate, UserProfileUpdate, UserProfileRead, UserProfileOut
 from crud.profiles import (
     get_own_profile, create_own_profile, update_own_profile,
     get_profile_by_id, update_profile_by_id, delete_profile_by_id, get_all_profiles
@@ -12,12 +13,19 @@ from typing import List
 router = APIRouter()
 
 
-@router.get("/me", response_model=UserProfileRead)
-async def get_my_profile(
+@router.get("/me", response_model=UserProfileOut)
+async def read_own_profile(
     db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user)
+    current_user: UserModel = Depends(get_current_user),
 ):
-    return await get_own_profile(db, current_user)
+    result = await db.execute(
+        select(UserProfileModel)
+        .where(UserProfileModel.user_id == current_user.id)
+    )
+    profile = result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
 
 
 @router.post("/", response_model=UserProfileRead)

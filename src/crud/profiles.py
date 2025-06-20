@@ -16,16 +16,24 @@ async def get_own_profile(db: AsyncSession, current_user: UserModel):
     return profile
 
 
-async def create_own_profile(db: AsyncSession, current_user: UserModel, profile_in: UserProfileCreate):
+async def create_own_profile(
+    db: AsyncSession,
+    current_user: UserModel,
+    profile_in: UserProfileCreate,
+) -> UserProfileModel:
     existing = await db.execute(
-        select(UserProfileModel).where(UserProfileModel.user_id == current_user.id)
+        select(UserProfileModel)
+        .where(UserProfileModel.user_id == current_user.id)
     )
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Profile already exists")
+
     obj = UserProfileModel(**profile_in.dict(), user_id=current_user.id)
-    async with db.begin():
-        db.add(obj)
+
+    db.add(obj)
+    await db.commit()
     await db.refresh(obj)
+
     return obj
 
 

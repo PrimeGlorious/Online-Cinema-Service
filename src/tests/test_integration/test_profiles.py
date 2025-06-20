@@ -1,12 +1,11 @@
 import uuid
-import re
 import anyio
 import psycopg2
 import pytest
 from httpx import AsyncClient
 
-PROF_BASE = "/api/v1/profiles/"
 API_BASE  = "http://localhost:8000"
+PROF_BASE = "/api/v1/profiles/"
 DSN       = "dbname=movies_db user=admin password=some_password host=localhost port=5432"
 
 
@@ -18,44 +17,42 @@ def _get_token_from_db(email: str, table: str) -> str:
         "WHERE user_id = (SELECT id FROM users WHERE email = %s)",
         (email,),
     )
-    row = cur.fetchone() or [None]
+    row = cur.fetchone()
     cur.close()
     conn.close()
-    return row[0]
+    return row[0] if row else None
 
 
 async def create_user_and_token():
+    # Реєструємо та активуємо звичайного користувача
     email = f"user_{uuid.uuid4().hex}@example.com"
-    pw    = "Qwerty123!"
+    pw = "Qwerty123!"
 
-    # 1) Реєстрація
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        await api.post(
+        r = await api.post(
             "/api/v1/accounts/register/",
             json={"email": email, "password": pw, "password_confirm": pw},
         )
+    assert r.status_code == 201, f"Registration failed: {r.text}"
 
-    # 2) Дістаємо activation_token із БД
-    activation_token = await anyio.to_thread.run_sync(
-        _get_token_from_db, email, "activation_tokens"
-    )
+    token = await anyio.to_thread.run_sync(_get_token_from_db, email, "activation_tokens")
+    assert token, "Activation token missing"
 
-    # 3) Активація
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        await api.get(f"/api/v1/accounts/activate/{activation_token}/")
+        r = await api.get(f"/api/v1/accounts/activate/{token}/")
+    assert r.status_code == 200, f"Activation failed: {r.text}"
 
-    # 4) Логін, повертаємо токен
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        resp = await api.post(
+        r = await api.post(
             "/api/v1/accounts/login/",
             json={"email": email, "password": pw},
         )
-    data = resp.json()
-    return {"email": email, "password": pw, "access_token": data["access_token"]}
+    assert r.status_code == 200, f"Login failed: {r.text}"
+    return {"email": email, "access_token": r.json()["access_token"]}
 
 
 @pytest.mark.asyncio
-async def test_profile_crud_as_user():
+async def test_user_profile_crud_lifecycle():
     user = await create_user_and_token()
     headers = {"Authorization": f"Bearer {user['access_token']}"}
 
@@ -63,47 +60,49 @@ async def test_profile_crud_as_user():
     data = {"first_name": "Test", "last_name": "User", "gender": "man", "info": "Hello"}
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
         r = await api.post(PROF_BASE, json=data, headers=headers)
-    assert r.status_code == 200
+    assert r.status_code in (200, 201), f"Create failed: {r.text}"
     prof = r.json()
     assert prof["first_name"] == "Test"
 
     # GET /me
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r2 = await api.get(PROF_BASE + "me", headers=headers)
-    assert r2.status_code == 200
+        r = await api.get(PROF_BASE + "me", headers=headers)
+    assert r.status_code == 200, f"Get own failed: {r.text}"
+    assert r.json()["id"] == prof["id"]
 
     # PATCH /me
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r3 = await api.patch(
-            PROF_BASE + "me", json={"info": "Updated"}, headers=headers
-        )
-    assert r3.json()["info"] == "Updated"
+        r = await api.patch(PROF_BASE + "me", json={"info": "Updated"}, headers=headers)
+    assert r.status_code == 200, f"Update own failed: {r.text}"
+    assert r.json()["info"] == "Updated"
 
-    # Ensure cannot access another’s profile
+    # Unauthorized cannot fetch someone else's
+    wrong = {"Authorization": "Bearer wrong.token.here"}
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r4 = await api.get(PROF_BASE + f"{prof['id']}", headers={"Authorization": "Bearer wrong"})
-    assert r4.status_code == 403
+        r = await api.get(PROF_BASE + str(prof["id"]), headers=wrong)
+    assert r.status_code == 403, f"Should forbid, got {r.status_code}"
 
 
 @pytest.mark.usefixtures("admin_credentials")
 @pytest.mark.asyncio
-async def test_profile_crud_as_admin(admin_credentials):
-    headers = {"Authorization": f"Bearer {admin_credentials['access_token']}"}
+async def test_admin_profile_crud(admin_credentials):
+    admin_headers = {"Authorization": f"Bearer {admin_credentials['access_token']}"}
 
-    # 1) Admin бачить всі профілі
+    # LIST
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r = await api.get(PROF_BASE, headers=headers)
-    assert r.status_code == 200
-    profiles = r.json()
-    assert isinstance(profiles, list)
+        r = await api.get(PROF_BASE, headers=admin_headers)
+    assert r.status_code == 200, f"List failed: {r.text}"
+    assert isinstance(r.json(), list)
 
-    # 2) Створюємо профіль іншого користувача
+    # Створимо профіль іншого користувача
     other = await create_user_and_token()
+    other_headers = {"Authorization": f"Bearer {other['access_token']}"}
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r = await api.post(PROF_BASE, json={"first_name": "X", "last_name": "Y"}, headers={"Authorization": f"Bearer {other['access_token']}"})
+        r = await api.post(PROF_BASE, json={"first_name": "X", "last_name": "Y"}, headers=other_headers)
+    assert r.status_code in (200, 201), f"Other create failed: {r.text}"
     prof = r.json()
 
-    # 3) Admin видаляє чужий профіль
+    # Admin видаляє цей профіль
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r_del = await api.delete(PROF_BASE + f"{prof['id']}", headers=headers)
-    assert r_del.status_code == 200 or r_del.status_code == 204
+        r = await api.delete(PROF_BASE + str(prof["id"]), headers=admin_headers)
+    assert r.status_code in (200, 204), f"Delete failed: {r.text}"

@@ -32,3 +32,15 @@ class UserProfileRead(UserProfileBase):
 
     class Config:
         orm_mode = True
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    user_id: int
+    first_name: str
+    last_name: str
+    gender: GenderEnum
+    info: Optional[str] = None
+
+    class Config:
+        orm_mode = True

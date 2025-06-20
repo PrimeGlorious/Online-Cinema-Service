@@ -11,6 +11,7 @@ from config import get_jwt_auth_manager, get_settings
 from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
     PasswordResetTokenModel
+from database.seed_data.utils import seed_user_groups
 
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
@@ -68,6 +69,8 @@ async def register_user(
         )
 
     # 2) Retrieve or seed default USER group
+    await seed_user_groups(db)
+
     default_group_id = await db.scalar(
         select(UserGroupModel.id).where(UserGroupModel.name == UserGroupEnum.USER)
     )

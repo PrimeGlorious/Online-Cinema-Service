@@ -41,10 +41,21 @@ def _get_token_from_db_sync(email: str, table: str) -> str:
 def _make_admin_sync(email: str):
     conn = psycopg2.connect(DSN)
     cur = conn.cursor()
-    cur.execute("UPDATE users SET role = 'admin' WHERE email = %s", (email,))
+    cur.execute(
+        """
+        UPDATE users
+        SET group_id = (
+            SELECT id FROM user_groups WHERE name = 'admin'
+        )
+        WHERE email = %s
+        """,
+        (email,),
+    )
     conn.commit()
     cur.close()
     conn.close()
+
+
 
 @pytest.fixture
 async def admin_credentials():
