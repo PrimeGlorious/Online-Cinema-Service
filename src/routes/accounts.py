@@ -1,4 +1,6 @@
 from datetime import datetime, timezone, timedelta
+import uuid
+
 
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy import select, delete
@@ -256,7 +258,11 @@ async def refresh_token(
     await db.flush()  # Ensure DELETE is applied before INSERT
 
     # 5) Generate new access and refresh tokens
-    payload = {"sub": str(user.id), "user_id": user.id}
+    payload = {
+        "sub": str(user.id),
+        "user_id": user.id,
+        "nonce": uuid.uuid4().hex
+    }
     access_token = jwt_manager.create_access_token(payload)
     new_refresh_token = jwt_manager.create_refresh_token(payload)
     days_valid = 7
