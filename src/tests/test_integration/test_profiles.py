@@ -77,10 +77,15 @@ async def test_user_profile_crud_lifecycle():
     assert r.json()["info"] == "Updated"
 
     # Unauthorized cannot fetch someone else's
-    wrong = {"Authorization": "Bearer wrong.token.here"}
+    other = await create_user_and_token()
+    other_headers = {"Authorization": f"Bearer {other['access_token']}"}
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
-        r = await api.get(PROF_BASE + str(prof["id"]), headers=wrong)
-    assert r.status_code == 403, f"Should forbid, got {r.status_code}"
+        r = await api.get(PROF_BASE + str(prof["id"]), headers=other_headers)
+    assert r.status_code == 403, f"Should forbid access for other user, got {r.status_code}"
+
+    async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
+        r = await api.get(PROF_BASE + str(prof["id"]))
+    assert r.status_code == 401, f"Should be Unauthorized without token, got {r.status_code}"
 
 
 @pytest.mark.usefixtures("admin_credentials")
@@ -97,6 +102,7 @@ async def test_admin_profile_crud(admin_credentials):
     # Створимо профіль іншого користувача
     other = await create_user_and_token()
     other_headers = {"Authorization": f"Bearer {other['access_token']}"}
+
     async with AsyncClient(base_url=API_BASE, timeout=30.0) as api:
         r = await api.post(PROF_BASE, json={"first_name": "X", "last_name": "Y"}, headers=other_headers)
     assert r.status_code in (200, 201), f"Other create failed: {r.text}"

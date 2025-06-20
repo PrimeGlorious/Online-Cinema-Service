@@ -45,7 +45,7 @@ def _make_admin_sync(email: str):
         """
         UPDATE users
         SET group_id = (
-            SELECT id FROM user_groups WHERE name = 'admin'
+            SELECT id FROM user_groups WHERE name = 'ADMIN'
         )
         WHERE email = %s
         """,
