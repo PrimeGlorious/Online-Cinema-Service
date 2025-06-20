@@ -221,7 +221,7 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
     jwt_manager=Depends(get_jwt_auth_manager),
 ):
-    # Find the refresh token in the database
+    # 1) Find the existing refresh token in the database
     stmt = select(RefreshTokenModel).where(RefreshTokenModel.token == data.refresh_token)
     result = await db.execute(stmt)
     refresh_token_obj = result.scalar_one_or_none()
@@ -231,7 +231,7 @@ async def refresh_token(
             detail="Invalid refresh token"
         )
 
-    # Check if the token is expired
+    # 2) Check if the token has expired
     now = datetime.now(timezone.utc)
     if refresh_token_obj.expires_at < now:
         await db.delete(refresh_token_obj)
@@ -241,22 +241,27 @@ async def refresh_token(
             detail="Refresh token expired"
         )
 
-    # Find the user
-    user = (await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))).scalar_one_or_none()
+    # 3) Retrieve the user and confirm they are active
+    user = (
+        await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))
+    ).scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User inactive or not found"
         )
 
-    # Delete the old refresh token, create a new one, commit
+    # 4) Delete the old refresh token record and flush the session
     await db.delete(refresh_token_obj)
+    await db.flush()  # Ensure DELETE is applied before INSERT
 
+    # 5) Generate new access and refresh tokens
     payload = {"sub": str(user.id), "user_id": user.id}
     access_token = jwt_manager.create_access_token(payload)
     new_refresh_token = jwt_manager.create_refresh_token(payload)
     days_valid = 7
 
+    # 6) Create and add a new refresh token record to the database
     refresh_token_db = RefreshTokenModel.create(
         user_id=user.id,
         days_valid=days_valid,
@@ -265,6 +270,7 @@ async def refresh_token(
     db.add(refresh_token_db)
     await db.commit()
 
+    # 7) Return the new tokens to the client
     return TokenRefreshResponseSchema(
         access_token=access_token,
         refresh_token=new_refresh_token,
