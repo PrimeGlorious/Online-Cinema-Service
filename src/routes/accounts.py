@@ -7,7 +7,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_jwt_auth_manager, get_settings
+from config import get_jwt_auth_manager
 from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
     PasswordResetTokenModel
@@ -16,6 +16,7 @@ from database.seed_data.utils import seed_user_groups
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
     LogoutRequestSchema, ChangePasswordRequest, PasswordResetConfirmSchema, PasswordResetRequestSchema
+from services.accounts import UserService
 from tasks.emails import send_activation_email_task, send_activation_complete_email_task, \
     send_password_reset_complete_email_task, send_password_reset_email_task
 
@@ -81,11 +82,11 @@ async def register_user(
         default_group_id = new_group.id
 
     # 3) Create UserModel and hash password
-    user = UserModel(
+    user = UserService.create(
         email=user_data.email,
-        group_id=default_group_id,
+        raw_password=user_data.password,
+        group_id=default_group_id
     )
-    user.password = user_data.password
     db.add(user)
     await db.flush()  # populate user.id
 
@@ -193,7 +194,7 @@ async def login(
         )
 
     # Verify password
-    if not user.verify_password(data.password):
+    if not UserService.verify_password(user, data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -314,7 +315,7 @@ async def change_password(
     current_user: UserModel = Depends(get_current_user)
 ):
     # Check the old password
-    if not current_user.verify_password(data.old_password):
+    if not UserService.verify_password(current_user, data.old_password):
         raise HTTPException(status_code=400, detail="Incorrect old password")
 
     # Check that the new password is different from the old one
@@ -322,7 +323,7 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be different from old password")
 
     # Set the new password
-    current_user.password = data.new_password
+    UserService.set_password(current_user, data.new_password)
     db.add(current_user)
     await db.commit()
     return {"message": "Password changed successfully"}
