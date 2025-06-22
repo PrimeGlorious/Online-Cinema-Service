@@ -1,18 +1,22 @@
 from datetime import datetime, timezone, timedelta
+import uuid
+
 
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_jwt_auth_manager, get_settings
+from config import get_jwt_auth_manager
 from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
     PasswordResetTokenModel
+from database.seed_data.utils import seed_user_groups
 
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
     LogoutRequestSchema, ChangePasswordRequest, PasswordResetConfirmSchema, PasswordResetRequestSchema
+from services.accounts import UserService
 from tasks.emails import send_activation_email_task, send_activation_complete_email_task, \
     send_password_reset_complete_email_task, send_password_reset_email_task
 
@@ -66,6 +70,8 @@ async def register_user(
         )
 
     # 2) Retrieve or seed default USER group
+    await seed_user_groups(db)
+
     default_group_id = await db.scalar(
         select(UserGroupModel.id).where(UserGroupModel.name == UserGroupEnum.USER)
     )
@@ -76,11 +82,11 @@ async def register_user(
         default_group_id = new_group.id
 
     # 3) Create UserModel and hash password
-    user = UserModel(
+    user = UserService.create(
         email=user_data.email,
-        group_id=default_group_id,
+        raw_password=user_data.password,
+        group_id=default_group_id
     )
-    user.password = user_data.password
     db.add(user)
     await db.flush()  # populate user.id
 
@@ -188,7 +194,7 @@ async def login(
         )
 
     # Verify password
-    if not user.verify_password(data.password):
+    if not UserService.verify_password(user, data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -221,7 +227,7 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
     jwt_manager=Depends(get_jwt_auth_manager),
 ):
-    # Find the refresh token in the database
+    # 1) Find the existing refresh token in the database
     stmt = select(RefreshTokenModel).where(RefreshTokenModel.token == data.refresh_token)
     result = await db.execute(stmt)
     refresh_token_obj = result.scalar_one_or_none()
@@ -231,7 +237,7 @@ async def refresh_token(
             detail="Invalid refresh token"
         )
 
-    # Check if the token is expired
+    # 2) Check if the token has expired
     now = datetime.now(timezone.utc)
     if refresh_token_obj.expires_at < now:
         await db.delete(refresh_token_obj)
@@ -241,22 +247,31 @@ async def refresh_token(
             detail="Refresh token expired"
         )
 
-    # Find the user
-    user = (await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))).scalar_one_or_none()
+    # 3) Retrieve the user and confirm they are active
+    user = (
+        await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))
+    ).scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User inactive or not found"
         )
 
-    # Delete the old refresh token, create a new one, commit
+    # 4) Delete the old refresh token record and flush the session
     await db.delete(refresh_token_obj)
+    await db.flush()  # Ensure DELETE is applied before INSERT
 
-    payload = {"sub": str(user.id), "user_id": user.id}
+    # 5) Generate new access and refresh tokens
+    payload = {
+        "sub": str(user.id),
+        "user_id": user.id,
+        "nonce": uuid.uuid4().hex
+    }
     access_token = jwt_manager.create_access_token(payload)
     new_refresh_token = jwt_manager.create_refresh_token(payload)
     days_valid = 7
 
+    # 6) Create and add a new refresh token record to the database
     refresh_token_db = RefreshTokenModel.create(
         user_id=user.id,
         days_valid=days_valid,
@@ -265,6 +280,7 @@ async def refresh_token(
     db.add(refresh_token_db)
     await db.commit()
 
+    # 7) Return the new tokens to the client
     return TokenRefreshResponseSchema(
         access_token=access_token,
         refresh_token=new_refresh_token,
@@ -299,7 +315,7 @@ async def change_password(
     current_user: UserModel = Depends(get_current_user)
 ):
     # Check the old password
-    if not current_user.verify_password(data.old_password):
+    if not UserService.verify_password(current_user, data.old_password):
         raise HTTPException(status_code=400, detail="Incorrect old password")
 
     # Check that the new password is different from the old one
@@ -307,7 +323,7 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be different from old password")
 
     # Set the new password
-    current_user.password = data.new_password
+    UserService.set_password(current_user, data.new_password)
     db.add(current_user)
     await db.commit()
     return {"message": "Password changed successfully"}
