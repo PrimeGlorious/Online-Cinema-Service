@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from fastapi import HTTPException
@@ -19,15 +20,13 @@ async def create_own_profile(
     current_user: UserModel,
     profile_in: UserProfileCreate,
 ) -> UserProfileModel:
-    existing = await db.execute(
-        select(UserProfileModel).where(UserProfileModel.user_id == current_user.id)
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Profile already exists")
-
     obj = UserProfileModel(**profile_in.dict(), user_id=current_user.id)
     db.add(obj)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Profile already exists")
     await db.refresh(obj)
     return obj
 
