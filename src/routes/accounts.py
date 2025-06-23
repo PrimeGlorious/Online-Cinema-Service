@@ -84,27 +84,32 @@ async def register_user(
         default_group_id = new_group.id
 
     # 3) Create UserModel and hash password
-    user = UserService.create(
-        email=user_data.email,
-        raw_password=user_data.password,
-        group_id=default_group_id
-    )
-    db.add(user)
-    await db.flush()  # populate user.id
+    try:
+        user = UserService.create(
+            email=user_data.email,
+            raw_password=user_data.password,
+            group_id=default_group_id
+        )
+        db.add(user)
+        await db.flush()  # populate user.id
 
-    # 4) Create activation token valid for 24 hours
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    activation_token = ActivationTokenModel(
-        user_id=user.id,
-        expires_at=expires_at
-    )
-    db.add(activation_token)
+        # 4) Create activation token valid for 24 hours
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        activation_token = ActivationTokenModel(
+            user_id=user.id,
+            expires_at=expires_at
+        )
+        db.add(activation_token)
 
-    # 5) Commit all operations atomically
-    await db.commit()
+        # 5) Commit all operations atomically
+        await db.commit()
 
-    # 6) Refresh to load relationships
-    await db.refresh(user)
+        # 6) Refresh to load relationships
+        await db.refresh(user)
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # 7) Trigger sending of activation email asynchronously
     activation_link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
@@ -136,10 +141,14 @@ async def activate_account(
         )
 
     # Activate the user and delete the activation token
-    user = record.user
-    user.is_active = True
-    await db.delete(record)
-    await db.commit()
+    try:
+        user = record.user
+        user.is_active = True
+        await db.delete(record)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
     login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
     send_activation_complete_email_task.delay(user.email, login_link)
@@ -160,20 +169,25 @@ async def resend_activation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found or already active")
 
     # Delete old activation tokens
-    await db.execute(
-        delete(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
-    )
-    await db.commit()
+    try:
+        await db.execute(
+            delete(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
+        )
+        await db.commit()
 
     # Create a new activation token
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    activation_token = ActivationTokenModel(
-        user_id=user.id,
-        expires_at=expires_at
-    )
-    db.add(activation_token)
-    await db.flush()
-    await db.commit()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        activation_token = ActivationTokenModel(
+            user_id=user.id,
+            expires_at=expires_at
+        )
+        db.add(activation_token)
+        await db.flush()
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Send activation email with the new link
     link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
@@ -327,9 +341,14 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be different from old password")
 
     # Set the new password
-    UserService.set_password(current_user, data.new_password)
-    db.add(current_user)
-    await db.commit()
+    try:
+        UserService.set_password(current_user, data.new_password)
+        db.add(current_user)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
     return {"message": "Password changed successfully"}
 
 
@@ -349,15 +368,20 @@ async def reset_password_request(
         return
 
     # Remove previous reset token
-    if user.password_reset_token:
-        await db.delete(user.password_reset_token)
-        await db.commit()
+    try:
+        if user.password_reset_token:
+            await db.delete(user.password_reset_token)
+            await db.commit()
 
     # Create new token
-    token_obj = PasswordResetTokenModel(user_id=user.id)
-    db.add(token_obj)
-    await db.commit()
-    await db.refresh(token_obj)
+        token_obj = PasswordResetTokenModel(user_id=user.id)
+        db.add(token_obj)
+        await db.commit()
+        await db.refresh(token_obj)
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Link
     frontend_url = f"{settings.ACCOUNTS_BASE_URL}/reset-password/"
@@ -391,12 +415,17 @@ async def reset_password(
     user = result.scalar_one()
 
     # Set the new password (validates and hashes automatically)
-    user.password = data.new_password
-    db.add(user)
+    try:
+        UserService.set_password(user, data.new_password)
+        db.add(user)
 
     # Remove the used token
-    await db.delete(token_obj)
-    await db.commit()
+        await db.delete(token_obj)
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Send password reset completion email with login link (async via Celery)
     login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
