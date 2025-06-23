@@ -17,6 +17,8 @@ class BaseAppSettings(BaseSettings):
     PASSWORD_RESET_COMPLETE_TEMPLATE_NAME: str = "password_reset_complete.html"
     PAYMENT_CONFIRMATION_TEMPLATE_NAME: str = "payment_confirmation.html"
 
+    ACCOUNTS_BASE_URL: str = os.getenv("ACCOUNTS_BASE_URL", "http://localhost:8000/api/v1/accounts")
+
     LOGIN_TIME_DAYS: int = 7
 
     EMAIL_HOST: str = os.getenv("EMAIL_HOST", "host")

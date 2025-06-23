@@ -1,18 +1,22 @@
 from datetime import datetime, timezone, timedelta
+import uuid
+
 
 from fastapi import APIRouter, status, Depends, HTTPException
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_jwt_auth_manager, get_settings
+from config import get_jwt_auth_manager, get_settings, BaseAppSettings
 from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
     PasswordResetTokenModel
+from database.seed_data.utils import seed_user_groups
 
 from schemas.accounts import UserRegistrationResponseSchema, UserRegistrationRequestSchema, EmailRequestSchema, \
     UserLoginResponseSchema, UserLoginRequestSchema, TokenRefreshResponseSchema, TokenRefreshRequestSchema, \
     LogoutRequestSchema, ChangePasswordRequest, PasswordResetConfirmSchema, PasswordResetRequestSchema
+from services.accounts import UserService
 from tasks.emails import send_activation_email_task, send_activation_complete_email_task, \
     send_password_reset_complete_email_task, send_password_reset_email_task
 
@@ -35,6 +39,7 @@ router = APIRouter()
 async def register_user(
     user_data: UserRegistrationRequestSchema,
     db: AsyncSession = Depends(get_db),
+    settings: BaseAppSettings = Depends(get_settings),
 ) -> UserRegistrationResponseSchema:
     """
     Register endpoint logic:
@@ -49,6 +54,7 @@ async def register_user(
     Args:
         user_data: Pydantic schema containing 'email' and 'password'.
         db: AsyncSession dependency for database operations.
+        settings: BaseAppSettings.
     Returns:
         UserRegistrationResponseSchema: Newly created user data.
     Raises:
@@ -66,6 +72,8 @@ async def register_user(
         )
 
     # 2) Retrieve or seed default USER group
+    await seed_user_groups(db)
+
     default_group_id = await db.scalar(
         select(UserGroupModel.id).where(UserGroupModel.name == UserGroupEnum.USER)
     )
@@ -76,30 +84,35 @@ async def register_user(
         default_group_id = new_group.id
 
     # 3) Create UserModel and hash password
-    user = UserModel(
-        email=user_data.email,
-        group_id=default_group_id,
-    )
-    user.password = user_data.password
-    db.add(user)
-    await db.flush()  # populate user.id
+    try:
+        user = UserService.create(
+            email=user_data.email,
+            raw_password=user_data.password,
+            group_id=default_group_id
+        )
+        db.add(user)
+        await db.flush()  # populate user.id
 
-    # 4) Create activation token valid for 24 hours
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    activation_token = ActivationTokenModel(
-        user_id=user.id,
-        expires_at=expires_at
-    )
-    db.add(activation_token)
+        # 4) Create activation token valid for 24 hours
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        activation_token = ActivationTokenModel(
+            user_id=user.id,
+            expires_at=expires_at
+        )
+        db.add(activation_token)
 
-    # 5) Commit all operations atomically
-    await db.commit()
+        # 5) Commit all operations atomically
+        await db.commit()
 
-    # 6) Refresh to load relationships
-    await db.refresh(user)
+        # 6) Refresh to load relationships
+        await db.refresh(user)
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # 7) Trigger sending of activation email asynchronously
-    activation_link = f"http://localhost:8000/api/v1/accounts/activate/{activation_token.token}/"
+    activation_link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
     print("CALL SEND_ACTIVATION_EMAIL_TASK", send_activation_email_task)
     send_activation_email_task.delay(
         user.email,
@@ -112,6 +125,7 @@ async def register_user(
 @router.get("/activate/{token}/")
 async def activate_account(
     token: str,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = (
@@ -127,12 +141,16 @@ async def activate_account(
         )
 
     # Activate the user and delete the activation token
-    user = record.user
-    user.is_active = True
-    await db.delete(record)
-    await db.commit()
+    try:
+        user = record.user
+        user.is_active = True
+        await db.delete(record)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
-    login_link = "http://localhost:8000/api/v1/accounts/login"
+    login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
     send_activation_complete_email_task.delay(user.email, login_link)
 
     return {"message": "Account activated successfully"}
@@ -141,6 +159,7 @@ async def activate_account(
 @router.post("/resend-activation/", status_code=status.HTTP_200_OK)
 async def resend_activation(
     data: EmailRequestSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db),
 ):
     # Find the user
@@ -150,23 +169,28 @@ async def resend_activation(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found or already active")
 
     # Delete old activation tokens
-    await db.execute(
-        delete(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
-    )
-    await db.commit()
+    try:
+        await db.execute(
+            delete(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
+        )
+        await db.commit()
 
     # Create a new activation token
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-    activation_token = ActivationTokenModel(
-        user_id=user.id,
-        expires_at=expires_at
-    )
-    db.add(activation_token)
-    await db.flush()
-    await db.commit()
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+        activation_token = ActivationTokenModel(
+            user_id=user.id,
+            expires_at=expires_at
+        )
+        db.add(activation_token)
+        await db.flush()
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Send activation email with the new link
-    link = f"http://localhost:8000/api/v1/accounts/activate/{activation_token.token}/"
+    link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
     send_activation_email_task.delay(user.email, link)
 
     return {"message": "New activation link sent"}
@@ -188,7 +212,7 @@ async def login(
         )
 
     # Verify password
-    if not user.verify_password(data.password):
+    if not UserService.verify_password(user, data.password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials"
@@ -221,7 +245,7 @@ async def refresh_token(
     db: AsyncSession = Depends(get_db),
     jwt_manager=Depends(get_jwt_auth_manager),
 ):
-    # Find the refresh token in the database
+    # 1) Find the existing refresh token in the database
     stmt = select(RefreshTokenModel).where(RefreshTokenModel.token == data.refresh_token)
     result = await db.execute(stmt)
     refresh_token_obj = result.scalar_one_or_none()
@@ -231,7 +255,7 @@ async def refresh_token(
             detail="Invalid refresh token"
         )
 
-    # Check if the token is expired
+    # 2) Check if the token has expired
     now = datetime.now(timezone.utc)
     if refresh_token_obj.expires_at < now:
         await db.delete(refresh_token_obj)
@@ -241,22 +265,31 @@ async def refresh_token(
             detail="Refresh token expired"
         )
 
-    # Find the user
-    user = (await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))).scalar_one_or_none()
+    # 3) Retrieve the user and confirm they are active
+    user = (
+        await db.execute(select(UserModel).where(UserModel.id == refresh_token_obj.user_id))
+    ).scalar_one_or_none()
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User inactive or not found"
         )
 
-    # Delete the old refresh token, create a new one, commit
+    # 4) Delete the old refresh token record and flush the session
     await db.delete(refresh_token_obj)
+    await db.flush()  # Ensure DELETE is applied before INSERT
 
-    payload = {"sub": str(user.id), "user_id": user.id}
+    # 5) Generate new access and refresh tokens
+    payload = {
+        "sub": str(user.id),
+        "user_id": user.id,
+        "nonce": uuid.uuid4().hex
+    }
     access_token = jwt_manager.create_access_token(payload)
     new_refresh_token = jwt_manager.create_refresh_token(payload)
     days_valid = 7
 
+    # 6) Create and add a new refresh token record to the database
     refresh_token_db = RefreshTokenModel.create(
         user_id=user.id,
         days_valid=days_valid,
@@ -265,6 +298,7 @@ async def refresh_token(
     db.add(refresh_token_db)
     await db.commit()
 
+    # 7) Return the new tokens to the client
     return TokenRefreshResponseSchema(
         access_token=access_token,
         refresh_token=new_refresh_token,
@@ -299,7 +333,7 @@ async def change_password(
     current_user: UserModel = Depends(get_current_user)
 ):
     # Check the old password
-    if not current_user.verify_password(data.old_password):
+    if not UserService.verify_password(current_user, data.old_password):
         raise HTTPException(status_code=400, detail="Incorrect old password")
 
     # Check that the new password is different from the old one
@@ -307,15 +341,21 @@ async def change_password(
         raise HTTPException(status_code=400, detail="New password must be different from old password")
 
     # Set the new password
-    current_user.password = data.new_password
-    db.add(current_user)
-    await db.commit()
+    try:
+        UserService.set_password(current_user, data.new_password)
+        db.add(current_user)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
     return {"message": "Password changed successfully"}
 
 
 @router.post("/reset-password-request/", status_code=204)
 async def reset_password_request(
     data: PasswordResetRequestSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
@@ -328,18 +368,23 @@ async def reset_password_request(
         return
 
     # Remove previous reset token
-    if user.password_reset_token:
-        await db.delete(user.password_reset_token)
-        await db.commit()
+    try:
+        if user.password_reset_token:
+            await db.delete(user.password_reset_token)
+            await db.commit()
 
     # Create new token
-    token_obj = PasswordResetTokenModel(user_id=user.id)
-    db.add(token_obj)
-    await db.commit()
-    await db.refresh(token_obj)
+        token_obj = PasswordResetTokenModel(user_id=user.id)
+        db.add(token_obj)
+        await db.commit()
+        await db.refresh(token_obj)
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Link
-    frontend_url = "https://localhost:8000/api/v1/accounts/reset-password/"
+    frontend_url = f"{settings.ACCOUNTS_BASE_URL}/reset-password/"
     reset_link = f"{frontend_url}{token_obj.token}"
 
     # Send email async (Celery)
@@ -350,6 +395,7 @@ async def reset_password_request(
 @router.post("/reset-password/", status_code=204)
 async def reset_password(
     data: PasswordResetConfirmSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     # Retrieve the password reset token from the database
@@ -369,15 +415,20 @@ async def reset_password(
     user = result.scalar_one()
 
     # Set the new password (validates and hashes automatically)
-    user.password = data.new_password
-    db.add(user)
+    try:
+        UserService.set_password(user, data.new_password)
+        db.add(user)
 
     # Remove the used token
-    await db.delete(token_obj)
-    await db.commit()
+        await db.delete(token_obj)
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise
 
     # Send password reset completion email with login link (async via Celery)
-    login_link = "https://localhost:8000/api/v1/accounts/login"
+    login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
     send_password_reset_complete_email_task.delay(user.email, login_link)
 
     return {"message": "Password reset successfully"}
