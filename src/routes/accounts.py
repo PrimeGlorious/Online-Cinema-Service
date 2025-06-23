@@ -7,7 +7,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from config import get_jwt_auth_manager
+from config import get_jwt_auth_manager, get_settings, BaseAppSettings
 from config.dependencies.custom import get_current_user
 from database import get_db, UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel, RefreshTokenModel, \
     PasswordResetTokenModel
@@ -39,6 +39,7 @@ router = APIRouter()
 async def register_user(
     user_data: UserRegistrationRequestSchema,
     db: AsyncSession = Depends(get_db),
+    settings: BaseAppSettings = Depends(get_settings),
 ) -> UserRegistrationResponseSchema:
     """
     Register endpoint logic:
@@ -53,6 +54,7 @@ async def register_user(
     Args:
         user_data: Pydantic schema containing 'email' and 'password'.
         db: AsyncSession dependency for database operations.
+        settings: BaseAppSettings.
     Returns:
         UserRegistrationResponseSchema: Newly created user data.
     Raises:
@@ -105,7 +107,7 @@ async def register_user(
     await db.refresh(user)
 
     # 7) Trigger sending of activation email asynchronously
-    activation_link = f"http://localhost:8000/api/v1/accounts/activate/{activation_token.token}/"
+    activation_link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
     print("CALL SEND_ACTIVATION_EMAIL_TASK", send_activation_email_task)
     send_activation_email_task.delay(
         user.email,
@@ -118,6 +120,7 @@ async def register_user(
 @router.get("/activate/{token}/")
 async def activate_account(
     token: str,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     stmt = (
@@ -138,7 +141,7 @@ async def activate_account(
     await db.delete(record)
     await db.commit()
 
-    login_link = "http://localhost:8000/api/v1/accounts/login"
+    login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
     send_activation_complete_email_task.delay(user.email, login_link)
 
     return {"message": "Account activated successfully"}
@@ -147,6 +150,7 @@ async def activate_account(
 @router.post("/resend-activation/", status_code=status.HTTP_200_OK)
 async def resend_activation(
     data: EmailRequestSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db),
 ):
     # Find the user
@@ -172,7 +176,7 @@ async def resend_activation(
     await db.commit()
 
     # Send activation email with the new link
-    link = f"http://localhost:8000/api/v1/accounts/activate/{activation_token.token}/"
+    link = f"{settings.ACCOUNTS_BASE_URL}/activate/{activation_token.token}/"
     send_activation_email_task.delay(user.email, link)
 
     return {"message": "New activation link sent"}
@@ -332,6 +336,7 @@ async def change_password(
 @router.post("/reset-password-request/", status_code=204)
 async def reset_password_request(
     data: PasswordResetRequestSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
@@ -355,7 +360,7 @@ async def reset_password_request(
     await db.refresh(token_obj)
 
     # Link
-    frontend_url = "https://localhost:8000/api/v1/accounts/reset-password/"
+    frontend_url = f"{settings.ACCOUNTS_BASE_URL}/reset-password/"
     reset_link = f"{frontend_url}{token_obj.token}"
 
     # Send email async (Celery)
@@ -366,6 +371,7 @@ async def reset_password_request(
 @router.post("/reset-password/", status_code=204)
 async def reset_password(
     data: PasswordResetConfirmSchema,
+    settings: BaseAppSettings = Depends(get_settings),
     db: AsyncSession = Depends(get_db)
 ):
     # Retrieve the password reset token from the database
@@ -393,7 +399,7 @@ async def reset_password(
     await db.commit()
 
     # Send password reset completion email with login link (async via Celery)
-    login_link = "https://localhost:8000/api/v1/accounts/login"
+    login_link = f"{settings.ACCOUNTS_BASE_URL}/login"
     send_password_reset_complete_email_task.delay(user.email, login_link)
 
     return {"message": "Password reset successfully"}
